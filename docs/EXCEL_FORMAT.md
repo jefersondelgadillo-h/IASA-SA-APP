@@ -72,6 +72,25 @@ Los dos códigos `PDF-MEC` y `PDF-ELEC` (limpieza de talleres) son
 genéricos, no personas — se puede poner un nombre como "Taller
 Mecánico" / "Taller Eléctrico" y su especialidad correspondiente.
 
+## El rol no tiene que ser Mecánico o Eléctrico
+
+Algunos códigos de "Puesto" corresponden a supervisores u otro personal
+de mantenimiento, no a técnicos de campo. En la sección "Técnicos" del
+panel admin el campo de rol es texto libre (por ejemplo "Supervisor",
+"Mantenimiento"): esa persona igual puede iniciar sesión y ver sus
+propias actividades, solo que **no cuenta para clasificar una
+actividad como Mecánica o Eléctrica** (eso lo hacen unicamente los
+códigos marcados exactamente como "Mecanico" o "Electrico").
+
+## Una misma persona puede tener mas de un código
+
+El Excel real no siempre usa el mismo código para la misma persona de
+una semana a otra (por ejemplo, alguien aparece como `ECAM` una semana
+y como `ECAMACHO` la siguiente). Si en el panel admin se registra el
+mismo nombre y rol para dos códigos distintos, la app los trata como
+la misma persona: al iniciar sesión, esa persona ve sus actividades
+sin importar cuál de sus códigos haya usado el Excel esa semana.
+
 ## Si los nombres de columna cambian
 
 Editando `server/config/excel-mapping.json` (sin tocar código) se

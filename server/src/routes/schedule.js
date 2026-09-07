@@ -17,13 +17,24 @@ router.get("/weeks", (req, res) => {
 // Tecnicos con nombre y rol ya registrados (para el selector de "quien soy" al entrar a la app).
 // Los codigos detectados en el Excel que aun no tienen nombre/rol asignado en el
 // panel admin no aparecen aqui todavia.
+// Una misma persona puede tener mas de un codigo (el Excel no siempre usa el
+// mismo codigo para alguien de una semana a otra), asi que se agrupa por
+// nombre+rol y se devuelve la lista de codigos de cada quien.
 router.get("/technicians", (req, res) => {
-  const technicians = db
+  const rows = db
     .prepare(
-      "SELECT id, code, name, role FROM technicians WHERE active = 1 AND name IS NOT NULL AND role IS NOT NULL ORDER BY role, name"
+      "SELECT code, name, role FROM technicians WHERE active = 1 AND name IS NOT NULL AND role IS NOT NULL ORDER BY role, name"
     )
     .all();
-  res.json(technicians);
+
+  const byPerson = new Map();
+  for (const r of rows) {
+    const key = `${r.role}::${r.name}`;
+    if (!byPerson.has(key)) byPerson.set(key, { name: r.name, role: r.role, codes: [] });
+    byPerson.get(key).codes.push(r.code);
+  }
+
+  res.json([...byPerson.values()]);
 });
 
 // Programacion semanal, con filtros opcionales.

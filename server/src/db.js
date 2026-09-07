@@ -13,14 +13,16 @@ db.pragma("foreign_keys = ON");
 
 // "code" es el codigo de "Puesto" tal cual aparece en el Excel (ej. WPAQUI, DCRUZ).
 // name/role quedan null hasta que el supervisor los complete en el panel admin
-// (seccion Tecnicos): sin eso, ese tecnico no aparece en el login ni se puede
-// clasificar su actividad como Mecanica o Electrica.
+// (seccion Tecnicos): sin eso, ese tecnico no aparece en el login. "role" es
+// texto libre (Mecanico, Electrico, Supervisor, Mantenimiento...) porque no
+// todos los codigos del Excel son tecnicos de campo; solo 'Mecanico' y
+// 'Electrico' cuentan para clasificar la especialidad de una actividad.
 db.exec(`
 CREATE TABLE IF NOT EXISTS technicians (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   code TEXT NOT NULL UNIQUE,
   name TEXT,
-  role TEXT CHECK (role IS NULL OR role IN ('Mecanico', 'Electrico')),
+  role TEXT,
   active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

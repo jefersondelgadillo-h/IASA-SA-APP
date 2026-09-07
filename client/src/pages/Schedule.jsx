@@ -20,7 +20,7 @@ export default function Schedule({ technician, onChangeUser }) {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [onlyMine, setOnlyMine] = useState(!!technician.code);
+  const [onlyMine, setOnlyMine] = useState(technician.codes?.length > 0);
   const [statusFilter, setStatusFilter] = useState("Todos");
   const [selected, setSelected] = useState(null);
 
@@ -50,13 +50,13 @@ export default function Schedule({ technician, onChangeUser }) {
     return activities.filter((a) => {
       if (statusFilter !== "Todos" && a.status !== statusFilter) return false;
       if (onlyMine) {
-        return technician.code && a.assigned_codes_list.includes(technician.code);
+        return technician.codes?.some((c) => a.assigned_codes_list.includes(c));
       }
       // Al ver "todas": se muestra la propia especialidad, y todo lo que aun
       // no tenga especialidad clasificada (para no perder actividades).
       return !a.activity_type || a.activity_type === technician.role;
     });
-  }, [activities, onlyMine, statusFilter, technician.code, technician.role]);
+  }, [activities, onlyMine, statusFilter, technician.codes, technician.role]);
 
   const grouped = useMemo(() => {
     const map = new Map();
@@ -80,7 +80,7 @@ export default function Schedule({ technician, onChangeUser }) {
           <div>
             <p className="font-bold text-lg leading-tight">IASA SA · Don Felipe</p>
             <p className="text-xs text-white/80">
-              {technician.name} · {technician.role === "Mecanico" ? "Mecanico" : "Electrico"}
+              {technician.name} · {technician.role}
               {week ? ` · Semana ${week}` : ""}
             </p>
           </div>
@@ -90,13 +90,13 @@ export default function Schedule({ technician, onChangeUser }) {
         </div>
 
         <label
-          className={`flex items-center gap-2 text-sm mb-2 ${!technician.code ? "opacity-60" : ""}`}
-          title={!technician.code ? "Pide a tu supervisor que te registre para poder usar este filtro" : ""}
+          className={`flex items-center gap-2 text-sm mb-2 ${!technician.codes?.length ? "opacity-60" : ""}`}
+          title={!technician.codes?.length ? "Pide a tu supervisor que te registre para poder usar este filtro" : ""}
         >
           <input
             type="checkbox"
             checked={onlyMine}
-            disabled={!technician.code}
+            disabled={!technician.codes?.length}
             onChange={(e) => setOnlyMine(e.target.checked)}
           />
           Ver solo mis actividades

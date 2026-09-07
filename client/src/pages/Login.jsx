@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 import { api } from "../lib/api.js";
 import { setTechnician } from "../lib/session.js";
 
+const ROLE_ORDER = ["Mecanico", "Electrico"];
+
 export default function Login({ onLogin }) {
   const [role, setRole] = useState("Mecanico");
   const [technicians, setTechnicians] = useState([]);
-  const [selectedCode, setSelectedCode] = useState("");
+  const [selectedName, setSelectedName] = useState("");
   const [customName, setCustomName] = useState("");
   const [useCustom, setUseCustom] = useState(false);
   const [error, setError] = useState("");
@@ -13,6 +15,24 @@ export default function Login({ onLogin }) {
   useEffect(() => {
     api.getTechnicians().then(setTechnicians).catch(() => setTechnicians([]));
   }, []);
+
+  useEffect(() => {
+    if (technicians.length === 0) return;
+    const availableRoles = new Set(technicians.map((t) => t.role));
+    if (!availableRoles.has(role)) {
+      setRole(technicians[0].role);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [technicians]);
+
+  // Roles reales presentes en el roster (Mecanico/Electrico primero, el
+  // resto -Supervisor, Mantenimiento, etc.- despues, en orden alfabetico).
+  const roles = [...new Set(technicians.map((t) => t.role))].sort((a, b) => {
+    const ia = ROLE_ORDER.indexOf(a);
+    const ib = ROLE_ORDER.indexOf(b);
+    if (ia !== -1 || ib !== -1) return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    return a.localeCompare(b);
+  });
 
   const filtered = technicians.filter((t) => t.role === role);
 
@@ -24,17 +44,17 @@ export default function Login({ onLogin }) {
         setError("Escribe tu nombre.");
         return;
       }
-      const tech = { code: null, name, role };
+      const tech = { codes: [], name, role };
       setTechnician(tech);
       onLogin(tech);
       return;
     }
-    const technician = filtered.find((t) => t.code === selectedCode);
+    const technician = filtered.find((t) => t.name === selectedName);
     if (!technician) {
       setError("Selecciona tu nombre de la lista.");
       return;
     }
-    const tech = { code: technician.code, name: technician.name, role: technician.role };
+    const tech = { codes: technician.codes, name: technician.name, role: technician.role };
     setTechnician(tech);
     onLogin(tech);
   }
@@ -46,19 +66,19 @@ export default function Login({ onLogin }) {
         <p className="text-center text-gray-500 text-sm mb-6">Programacion semanal · Planta Don Felipe</p>
 
         <p className="text-sm font-medium text-gray-700 mb-2">Soy</p>
-        <div className="grid grid-cols-2 gap-2 mb-4">
-          {["Mecanico", "Electrico"].map((r) => (
+        <div className="flex flex-wrap gap-2 mb-4">
+          {(roles.length > 0 ? roles : ROLE_ORDER).map((r) => (
             <button
               key={r}
               onClick={() => {
                 setRole(r);
-                setSelectedCode("");
+                setSelectedName("");
               }}
-              className={`rounded-xl border-2 py-3 font-medium text-sm ${
+              className={`rounded-xl border-2 py-3 px-4 font-medium text-sm ${
                 role === r ? "border-iasa-blue bg-iasa-blue/5 text-iasa-blue" : "border-gray-200 text-gray-600"
               }`}
             >
-              {r === "Mecanico" ? "Mecanico" : "Electrico"}
+              {r}
             </button>
           ))}
         </div>
@@ -67,13 +87,13 @@ export default function Login({ onLogin }) {
         {!useCustom ? (
           <>
             <select
-              value={selectedCode}
-              onChange={(e) => setSelectedCode(e.target.value)}
+              value={selectedName}
+              onChange={(e) => setSelectedName(e.target.value)}
               className="w-full border border-gray-300 rounded-xl p-3 text-sm mb-2"
             >
               <option value="">Selecciona tu nombre...</option>
               {filtered.map((t) => (
-                <option key={t.id} value={t.code}>
+                <option key={t.name} value={t.name}>
                   {t.name}
                 </option>
               ))}

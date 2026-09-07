@@ -46,15 +46,13 @@ function TechnicianRow({ technician, onSaved }) {
         />
       </td>
       <td className="py-2 pr-3">
-        <select
+        <input
           value={role}
           onChange={(e) => setRole(e.target.value)}
+          placeholder="Sin definir"
+          list="technician-roles"
           className="w-full border border-gray-300 rounded-lg p-1.5 text-sm"
-        >
-          <option value="">Sin definir</option>
-          <option value="Mecanico">Mecanico</option>
-          <option value="Electrico">Electrico</option>
-        </select>
+        />
       </td>
       <td className="py-2 pr-3">
         <button
@@ -350,9 +348,16 @@ export default function Admin() {
             </button>
           </div>
           <p className="text-xs text-gray-500 mb-3">
-            El codigo viene del Excel (columna "Puesto"). Completa el nombre y la especialidad para que ese tecnico
-            pueda iniciar sesion en la app y sus actividades se clasifiquen correctamente.
+            El codigo viene del Excel (columna "Puesto"). Completa el nombre y el rol para que ese tecnico pueda
+            iniciar sesion en la app. Solo "Mecanico" y "Electrico" clasifican la especialidad de sus actividades;
+            otros roles (Supervisor, Mantenimiento...) igual pueden iniciar sesion y ver sus propias actividades.
           </p>
+          <datalist id="technician-roles">
+            <option value="Mecanico" />
+            <option value="Electrico" />
+            <option value="Supervisor" />
+            <option value="Mantenimiento" />
+          </datalist>
           {techError && <p className="text-sm text-red-600 mb-2">{techError}</p>}
           <div className="overflow-x-auto -mx-4 px-4">
             <table className="w-full text-sm min-w-[520px]">
@@ -360,7 +365,7 @@ export default function Admin() {
                 <tr className="text-left text-gray-500 border-b">
                   <th className="py-2 pr-3">Codigo</th>
                   <th className="py-2 pr-3">Nombre</th>
-                  <th className="py-2 pr-3">Especialidad</th>
+                  <th className="py-2 pr-3">Rol</th>
                   <th className="py-2 pr-3"></th>
                 </tr>
               </thead>

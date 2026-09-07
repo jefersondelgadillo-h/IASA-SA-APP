@@ -21,7 +21,12 @@ router.post("/admin/upload", adminAuth, upload.single("file"), (req, res) => {
   }
 
   const rosterRows = db.prepare("SELECT code, role FROM technicians").all();
-  const rosterMap = new Map(rosterRows.filter((r) => r.role).map((r) => [r.code, r.role]));
+  // Solo Mecanico/Electrico clasifican la especialidad de una actividad;
+  // otros roles (Supervisor, Mantenimiento, etc.) igual pueden iniciar
+  // sesion y ver sus propias actividades por codigo, pero no cuentan aqui.
+  const rosterMap = new Map(
+    rosterRows.filter((r) => r.role === "Mecanico" || r.role === "Electrico").map((r) => [r.code, r.role])
+  );
   const knownCodes = new Set(rosterRows.map((r) => r.code));
 
   let parsed;
@@ -130,9 +135,6 @@ router.get("/admin/technicians", adminAuth, (req, res) => {
 
 router.patch("/admin/technicians/:id", adminAuth, (req, res) => {
   const { name, role } = req.body || {};
-  if (role && !["Mecanico", "Electrico"].includes(role)) {
-    return res.status(400).json({ error: "Rol invalido. Usa Mecanico o Electrico." });
-  }
   const technician = db.prepare("SELECT * FROM technicians WHERE id = ?").get(req.params.id);
   if (!technician) return res.status(404).json({ error: "Tecnico no encontrado." });
 
