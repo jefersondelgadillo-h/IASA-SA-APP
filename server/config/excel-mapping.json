@@ -1,0 +1,17 @@
+{
+  "_comment": "Ajusta estos nombres para que coincidan EXACTAMENTE con los encabezados de la hoja de Excel que llega cada lunes. No hace falta tocar codigo, solo este archivo. Ver docs/EXCEL_FORMAT.md",
+  "sheetName": null,
+  "headerRow": 1,
+  "columns": {
+    "fecha": ["Fecha", "Dia", "Fecha Programada"],
+    "area": ["Area", "Área", "Linea", "Línea"],
+    "equipo": ["Equipo", "Maquina", "Máquina", "Activo"],
+    "actividad": ["Actividad", "Descripcion", "Descripción", "Tarea"],
+    "tipo": ["Tipo", "Especialidad", "Disciplina"],
+    "responsable": ["Responsable", "Tecnico", "Técnico", "Asignado a"],
+    "turno": ["Turno"],
+    "prioridad": ["Prioridad"]
+  },
+  "tipoMecanicoValues": ["Mecanico", "Mecánico", "Mecanica", "Mecánica", "MEC", "M"],
+  "tipoElectricoValues": ["Electrico", "Eléctrico", "Electrica", "Eléctrica", "ELEC", "E"]
+}

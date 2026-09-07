@@ -1,0 +1,11 @@
+{
+  "name": "Mantenimiento IASA SA - Planta Don Felipe",
+  "short_name": "Mant. IASA",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0B4F8A",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

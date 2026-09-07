@@ -1,0 +1,22 @@
+{
+  "name": "iasa-mantenimiento-server",
+  "version": "1.0.0",
+  "description": "API para la app de programacion semanal de mantenimiento de IASA SA (Planta Don Felipe)",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "multer": "^2.0.1",
+    "xlsx": "^0.18.5"
+  },
+  "overrides": {
+    "qs": "^6.16.0"
+  }
+}
