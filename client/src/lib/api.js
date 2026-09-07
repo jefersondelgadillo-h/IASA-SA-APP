@@ -43,4 +43,11 @@ export const api = {
       body: form,
     });
   },
+  adminGetTechnicians: (password) => request("/admin/technicians", { headers: { "x-admin-password": password } }),
+  adminUpdateTechnician: (password, id, body) =>
+    request(`/admin/technicians/${id}`, {
+      method: "PATCH",
+      headers: { "x-admin-password": password },
+      body: JSON.stringify(body),
+    }),
 };

@@ -1,17 +1,14 @@
 {
-  "_comment": "Ajusta estos nombres para que coincidan EXACTAMENTE con los encabezados de la hoja de Excel que llega cada lunes. No hace falta tocar codigo, solo este archivo. Ver docs/EXCEL_FORMAT.md",
+  "_comment": "Ajusta estos nombres si cambian los encabezados del Excel semanal (formato tipo Gantt: Sector/Orden/Equipo/Descripcion/Puesto/Inicio/Fin/Dur. + una columna por dia). Ver docs/EXCEL_FORMAT.md",
   "sheetName": null,
   "headerRow": 1,
   "columns": {
-    "fecha": ["Fecha", "Dia", "Fecha Programada"],
-    "area": ["Area", "Área", "Linea", "Línea"],
+    "sector": ["Sector"],
+    "orden": ["Orden", "N Orden", "Nro Orden"],
     "equipo": ["Equipo", "Maquina", "Máquina", "Activo"],
-    "actividad": ["Actividad", "Descripcion", "Descripción", "Tarea"],
-    "tipo": ["Tipo", "Especialidad", "Disciplina"],
-    "responsable": ["Responsable", "Tecnico", "Técnico", "Asignado a"],
-    "turno": ["Turno"],
-    "prioridad": ["Prioridad"]
+    "descripcion": ["Descripción", "Descripcion", "Actividad", "Tarea"],
+    "puesto": ["Puesto", "Responsable", "Tecnico", "Técnico"],
+    "duracion": ["Dur.", "Dur", "Duracion", "Duración"]
   },
-  "tipoMecanicoValues": ["Mecanico", "Mecánico", "Mecanica", "Mecánica", "MEC", "M"],
-  "tipoElectricoValues": ["Electrico", "Eléctrico", "Electrica", "Eléctrica", "ELEC", "E"]
+  "_dayColumns": "Todas las columnas despues de 'duracion' (hasta la primera vacia) se toman como los dias de la semana, en orden, empezando el lunes indicado al subir el archivo. El texto del encabezado de esas columnas (ej. 'Mon 31') no se usa para la fecha, solo la posicion."
 }

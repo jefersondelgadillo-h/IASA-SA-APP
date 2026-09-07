@@ -14,10 +14,14 @@ router.get("/weeks", (req, res) => {
   res.json(weeks);
 });
 
-// Tecnicos conocidos (para el selector de "quien soy" al entrar a la app).
+// Tecnicos con nombre y rol ya registrados (para el selector de "quien soy" al entrar a la app).
+// Los codigos detectados en el Excel que aun no tienen nombre/rol asignado en el
+// panel admin no aparecen aqui todavia.
 router.get("/technicians", (req, res) => {
   const technicians = db
-    .prepare("SELECT id, name, role FROM technicians WHERE active = 1 ORDER BY role, name")
+    .prepare(
+      "SELECT id, code, name, role FROM technicians WHERE active = 1 AND name IS NOT NULL AND role IS NOT NULL ORDER BY role, name"
+    )
     .all();
   res.json(technicians);
 });
@@ -25,7 +29,7 @@ router.get("/technicians", (req, res) => {
 // Programacion semanal, con filtros opcionales.
 // ?week=YYYY-MM-DD  (por defecto la semana mas reciente cargada)
 // ?role=Mecanico|Electrico
-// ?technician=Nombre
+// ?technician=CODIGO (codigo de Puesto, ej. WPAQUI)
 // ?status=Pendiente|En progreso|Completado|Con problema
 router.get("/schedule", (req, res) => {
   const week = req.query.week || currentWeekStart();
@@ -42,8 +46,8 @@ router.get("/schedule", (req, res) => {
     params.push(req.query.role);
   }
   if (req.query.technician) {
-    clauses.push("assigned_to = ?");
-    params.push(req.query.technician);
+    clauses.push("assigned_codes LIKE ?");
+    params.push(`%,${req.query.technician},%`);
   }
   if (req.query.status) {
     clauses.push("status = ?");
@@ -56,7 +60,19 @@ router.get("/schedule", (req, res) => {
     )
     .all(...params);
 
-  res.json({ week, activities });
+  const nameByCode = new Map(
+    db.prepare("SELECT code, name FROM technicians").all().map((t) => [t.code, t.name])
+  );
+  const withNames = activities.map((a) => ({
+    ...a,
+    assigned_codes_list: a.assigned_codes.split(",").filter(Boolean),
+    resolved_names: a.assigned_codes
+      .split(",")
+      .filter(Boolean)
+      .map((c) => nameByCode.get(c) || c),
+  }));
+
+  res.json({ week, activities: withNames });
 });
 
 export default router;

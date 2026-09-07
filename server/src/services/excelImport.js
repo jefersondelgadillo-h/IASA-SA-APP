@@ -25,44 +25,54 @@ function findColumnIndex(headerCells, candidates) {
   return -1;
 }
 
-function classifyType(rawValue) {
-  const v = normalize(rawValue);
-  if (mapping.tipoMecanicoValues.some((c) => normalize(c) === v)) return "Mecanico";
-  if (mapping.tipoElectricoValues.some((c) => normalize(c) === v)) return "Electrico";
-  // fallback: intenta detectar por substring
-  if (v.startsWith("mec")) return "Mecanico";
-  if (v.startsWith("ele")) return "Electrico";
-  return null;
+function addDays(isoDate, days) {
+  const d = new Date(`${isoDate}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
 }
 
-function excelDateToISO(value) {
-  if (value == null || value === "") return null;
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
-  if (typeof value === "number") {
-    const parsed = XLSX.SSF.parse_date_code(value);
-    if (!parsed) return null;
-    const mm = String(parsed.m).padStart(2, "0");
-    const dd = String(parsed.d).padStart(2, "0");
-    return `${parsed.y}-${mm}-${dd}`;
-  }
-  const str = String(value).trim();
-  // dd/mm/yyyy o dd-mm-yyyy
-  const m = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
-  if (m) {
-    let [, d, mo, y] = m;
-    if (y.length === 2) y = `20${y}`;
-    return `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}`;
-  }
-  // yyyy-mm-dd ya viene bien
-  if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str.slice(0, 10);
-  return str;
+/** Separa el contenido de "Puesto" en codigos individuales: "CRIOS/EVARGAS" -> ["CRIOS","EVARGAS"] */
+function parsePuestoCodes(raw) {
+  return String(raw ?? "")
+    .split(/[/,]/)
+    .map((c) => c.trim().toUpperCase())
+    .filter(Boolean);
 }
 
 /**
- * Parsea el buffer de un .xlsx y devuelve las actividades encontradas.
- * Lanza un Error con un mensaje entendible si faltan columnas obligatorias.
+ * Determina la especialidad de una fila a partir de los codigos asignados y el
+ * roster conocido (code -> 'Mecanico' | 'Electrico' | null).
+ * Si todos los codigos conocidos coinciden en una especialidad, se usa esa.
+ * Si hay mezcla, o ningun codigo esta clasificado todavia, devuelve null
+ * (queda "sin clasificar" hasta que se complete el roster en el panel admin).
  */
-export function parseScheduleWorkbook(buffer) {
+function classifyByRoster(codes, rosterMap) {
+  const roles = new Set();
+  for (const code of codes) {
+    const role = rosterMap.get(code);
+    if (role) roles.add(role);
+  }
+  if (roles.size === 1) return [...roles][0];
+  return null;
+}
+
+function isNonEmptyNumber(value) {
+  if (value === "" || value == null) return false;
+  const n = Number(value);
+  return !Number.isNaN(n) && n > 0;
+}
+
+/**
+ * Parsea el buffer de un .xlsx (formato tipo Gantt semanal: Sector, Orden,
+ * Equipo, Descripcion, Puesto, Inicio, Fin, Dur., y luego una columna por dia
+ * con las horas planificadas) y devuelve una ocurrencia por cada (orden, dia
+ * con horas > 0), lista para insertar en la tabla `activities`.
+ *
+ * @param {Buffer} buffer contenido del .xlsx
+ * @param {string} weekStart fecha ISO (YYYY-MM-DD) del lunes de esa semana
+ * @param {Map<string,string>} rosterMap codigo de tecnico -> 'Mecanico'|'Electrico'
+ */
+export function parseScheduleWorkbook(buffer, weekStart, rosterMap = new Map()) {
   const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
   const sheetName = mapping.sheetName && workbook.SheetNames.includes(mapping.sheetName)
     ? mapping.sheetName
@@ -75,19 +85,17 @@ export function parseScheduleWorkbook(buffer) {
   const headerCells = (rows[headerRowIdx] || []).map((c) => String(c ?? ""));
 
   const colIdx = {
-    fecha: findColumnIndex(headerCells, mapping.columns.fecha),
-    area: findColumnIndex(headerCells, mapping.columns.area),
+    sector: findColumnIndex(headerCells, mapping.columns.sector),
+    orden: findColumnIndex(headerCells, mapping.columns.orden),
     equipo: findColumnIndex(headerCells, mapping.columns.equipo),
-    actividad: findColumnIndex(headerCells, mapping.columns.actividad),
-    tipo: findColumnIndex(headerCells, mapping.columns.tipo),
-    responsable: findColumnIndex(headerCells, mapping.columns.responsable),
-    turno: findColumnIndex(headerCells, mapping.columns.turno),
-    prioridad: findColumnIndex(headerCells, mapping.columns.prioridad),
+    descripcion: findColumnIndex(headerCells, mapping.columns.descripcion),
+    puesto: findColumnIndex(headerCells, mapping.columns.puesto),
+    duracion: findColumnIndex(headerCells, mapping.columns.duracion),
   };
 
   const missing = [];
-  if (colIdx.actividad === -1) missing.push("Actividad/Descripcion");
-  if (colIdx.tipo === -1) missing.push("Tipo (Mecanico/Electrico)");
+  if (colIdx.descripcion === -1) missing.push("Descripción/Actividad");
+  if (colIdx.puesto === -1) missing.push("Puesto/Responsable");
   if (missing.length) {
     throw new Error(
       `No se pudieron identificar estas columnas en el Excel: ${missing.join(", ")}. ` +
@@ -96,36 +104,70 @@ export function parseScheduleWorkbook(buffer) {
     );
   }
 
+  // Las columnas de dias son todas las que vienen despues de "Duracion" (o,
+  // si no se encontro esa columna, despues de la ultima columna fija
+  // conocida) hasta la primera columna sin encabezado.
+  const lastFixedCol = Math.max(...Object.values(colIdx).filter((i) => i !== -1));
+  const dayColumns = [];
+  for (let c = lastFixedCol + 1; c < headerCells.length; c++) {
+    if (!String(headerCells[c] ?? "").trim()) break;
+    dayColumns.push(c);
+  }
+  if (dayColumns.length === 0) {
+    throw new Error(
+      "No se encontraron columnas de dias despues de la columna de duracion. " +
+        "Revisa que el Excel tenga una columna por dia de la semana con las horas planificadas."
+    );
+  }
+
   const activities = [];
-  let rowOrder = 0;
+  const allCodes = new Set();
+  let sourceRow = 0;
+
   for (let i = headerRowIdx + 1; i < rows.length; i++) {
     const row = rows[i];
     if (!row || row.every((c) => c === "" || c == null)) continue;
 
-    const actividad = String(row[colIdx.actividad] ?? "").trim();
-    if (!actividad) continue;
+    const descripcion = String(row[colIdx.descripcion] ?? "").trim();
+    const puestoRaw = String(row[colIdx.puesto] ?? "").trim();
+    if (!descripcion || !puestoRaw) continue; // fila incompleta, se omite
 
-    const tipo = classifyType(row[colIdx.tipo]);
-    if (!tipo) continue; // fila que no corresponde a mecanico ni electrico, se omite
+    const codes = parsePuestoCodes(puestoRaw);
+    if (codes.length === 0) continue;
+    codes.forEach((c) => allCodes.add(c));
 
-    activities.push({
-      activity_date: colIdx.fecha !== -1 ? excelDateToISO(row[colIdx.fecha]) : null,
-      area: colIdx.area !== -1 ? String(row[colIdx.area] ?? "").trim() : "",
-      equipment: colIdx.equipo !== -1 ? String(row[colIdx.equipo] ?? "").trim() : "",
-      description: actividad,
-      activity_type: tipo,
-      assigned_to: colIdx.responsable !== -1 ? String(row[colIdx.responsable] ?? "").trim() : "",
-      shift: colIdx.turno !== -1 ? String(row[colIdx.turno] ?? "").trim() : "",
-      priority: colIdx.prioridad !== -1 ? String(row[colIdx.prioridad] ?? "").trim() : "",
-      row_order: rowOrder++,
-    });
+    const activityType = classifyByRoster(codes, rosterMap);
+    const orden = colIdx.orden !== -1 ? String(row[colIdx.orden] ?? "").trim() : "";
+    const sector = colIdx.sector !== -1 ? String(row[colIdx.sector] ?? "").trim() : "";
+    const equipo = colIdx.equipo !== -1 ? String(row[colIdx.equipo] ?? "").trim() : "";
+
+    sourceRow++;
+    let dayOffset = 0;
+    for (const dayCol of dayColumns) {
+      const hoursValue = row[dayCol];
+      if (isNonEmptyNumber(hoursValue)) {
+        activities.push({
+          order_number: orden,
+          activity_date: addDays(weekStart, dayOffset),
+          area: sector,
+          equipment: equipo,
+          description: descripcion,
+          activity_type: activityType,
+          assigned_to: puestoRaw,
+          assigned_codes: `,${codes.join(",")},`,
+          planned_hours: Number(hoursValue),
+          row_order: sourceRow * 100 + dayOffset,
+        });
+      }
+      dayOffset++;
+    }
   }
 
   if (activities.length === 0) {
     throw new Error(
-      "El archivo no tiene filas de actividades validas (revisa que la columna Tipo diga Mecanico o Electrico)."
+      "El archivo no tiene filas de actividades validas (revisa que existan filas con Descripcion, Puesto y al menos un dia con horas planificadas)."
     );
   }
 
-  return activities;
+  return { activities, allCodes };
 }

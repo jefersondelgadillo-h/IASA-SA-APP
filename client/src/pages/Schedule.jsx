@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api.js";
-import { clearTechnician } from "../lib/session.js";
 import ActivityCard from "../components/ActivityCard.jsx";
 import UpdateStatusModal from "../components/UpdateStatusModal.jsx";
 
@@ -21,7 +20,7 @@ export default function Schedule({ technician, onChangeUser }) {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [onlyMine, setOnlyMine] = useState(true);
+  const [onlyMine, setOnlyMine] = useState(!!technician.code);
   const [statusFilter, setStatusFilter] = useState("Todos");
   const [selected, setSelected] = useState(null);
 
@@ -29,7 +28,10 @@ export default function Schedule({ technician, onChangeUser }) {
     setLoading(true);
     setError("");
     try {
-      const data = await api.getSchedule({ role: technician.role });
+      // Se trae toda la semana sin filtrar por especialidad: la clasificacion
+      // Mecanico/Electrico puede faltar para algunos codigos todavia, y no
+      // queremos que eso oculte actividades por error.
+      const data = await api.getSchedule({});
       setWeek(data.week);
       setActivities(data.activities);
     } catch (err) {
@@ -42,15 +44,19 @@ export default function Schedule({ technician, onChangeUser }) {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [technician.role]);
+  }, []);
 
   const filtered = useMemo(() => {
     return activities.filter((a) => {
-      if (onlyMine && a.assigned_to !== technician.name) return false;
       if (statusFilter !== "Todos" && a.status !== statusFilter) return false;
-      return true;
+      if (onlyMine) {
+        return technician.code && a.assigned_codes_list.includes(technician.code);
+      }
+      // Al ver "todas": se muestra la propia especialidad, y todo lo que aun
+      // no tenga especialidad clasificada (para no perder actividades).
+      return !a.activity_type || a.activity_type === technician.role;
     });
-  }, [activities, onlyMine, statusFilter, technician.name]);
+  }, [activities, onlyMine, statusFilter, technician.code, technician.role]);
 
   const grouped = useMemo(() => {
     const map = new Map();
@@ -64,7 +70,7 @@ export default function Schedule({ technician, onChangeUser }) {
 
   async function handleSaveStatus(id, body) {
     const updated = await api.updateStatus(id, body);
-    setActivities((prev) => prev.map((a) => (a.id === id ? updated : a)));
+    setActivities((prev) => prev.map((a) => (a.id === id ? { ...a, ...updated } : a)));
   }
 
   return (
@@ -83,8 +89,16 @@ export default function Schedule({ technician, onChangeUser }) {
           </button>
         </div>
 
-        <label className="flex items-center gap-2 text-sm mb-2">
-          <input type="checkbox" checked={onlyMine} onChange={(e) => setOnlyMine(e.target.checked)} />
+        <label
+          className={`flex items-center gap-2 text-sm mb-2 ${!technician.code ? "opacity-60" : ""}`}
+          title={!technician.code ? "Pide a tu supervisor que te registre para poder usar este filtro" : ""}
+        >
+          <input
+            type="checkbox"
+            checked={onlyMine}
+            disabled={!technician.code}
+            onChange={(e) => setOnlyMine(e.target.checked)}
+          />
           Ver solo mis actividades
         </label>
 

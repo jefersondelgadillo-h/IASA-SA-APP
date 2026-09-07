@@ -20,12 +20,19 @@ router.post("/admin/upload", adminAuth, upload.single("file"), (req, res) => {
     return res.status(400).json({ error: "Indica la fecha de inicio de semana (YYYY-MM-DD)." });
   }
 
-  let activities;
+  const rosterRows = db.prepare("SELECT code, role FROM technicians").all();
+  const rosterMap = new Map(rosterRows.filter((r) => r.role).map((r) => [r.code, r.role]));
+  const knownCodes = new Set(rosterRows.map((r) => r.code));
+
+  let parsed;
   try {
-    activities = parseScheduleWorkbook(req.file.buffer);
+    parsed = parseScheduleWorkbook(req.file.buffer, weekStart, rosterMap);
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
+  const { activities, allCodes } = parsed;
+
+  const newTechnicianCodes = [...allCodes].filter((c) => !knownCodes.has(c));
 
   const tx = db.transaction(() => {
     let week = db.prepare("SELECT id FROM weeks WHERE week_start = ?").get(weekStart);
@@ -44,17 +51,21 @@ router.post("/admin/upload", adminAuth, upload.single("file"), (req, res) => {
 
     const insertActivity = db.prepare(`
       INSERT INTO activities
-        (week_id, activity_date, area, equipment, description, activity_type, assigned_to, shift, priority, row_order)
-      VALUES (@week_id, @activity_date, @area, @equipment, @description, @activity_type, @assigned_to, @shift, @priority, @row_order)
+        (week_id, order_number, activity_date, area, equipment, description, activity_type,
+         assigned_to, assigned_codes, planned_hours, row_order)
+      VALUES (@week_id, @order_number, @activity_date, @area, @equipment, @description, @activity_type,
+              @assigned_to, @assigned_codes, @planned_hours, @row_order)
     `);
-    const upsertTechnician = db.prepare(`
-      INSERT INTO technicians (name, role) VALUES (?, ?)
-      ON CONFLICT(name) DO NOTHING
+    const insertTechnician = db.prepare(`
+      INSERT INTO technicians (code, name, role) VALUES (?, NULL, NULL)
+      ON CONFLICT(code) DO NOTHING
     `);
 
     for (const a of activities) {
       insertActivity.run({ ...a, week_id: week.id });
-      if (a.assigned_to) upsertTechnician.run(a.assigned_to, a.activity_type);
+    }
+    for (const code of newTechnicianCodes) {
+      insertTechnician.run(code);
     }
 
     return week.id;
@@ -63,7 +74,12 @@ router.post("/admin/upload", adminAuth, upload.single("file"), (req, res) => {
   const weekId = tx();
   const count = db.prepare("SELECT COUNT(*) AS c FROM activities WHERE week_id = ?").get(weekId).c;
 
-  res.json({ ok: true, week_start: weekStart, activities_loaded: count });
+  res.json({
+    ok: true,
+    week_start: weekStart,
+    activities_loaded: count,
+    new_technicians: newTechnicianCodes,
+  });
 });
 
 // Tablero completo para el supervisor: todas las actividades de una semana con su estado/comentario.
@@ -82,12 +98,50 @@ router.get("/admin/dashboard", adminAuth, (req, res) => {
     )
     .all(weekRow.id);
 
-  const stats = { total: activities.length };
-  for (const a of activities) {
+  const nameByCode = new Map(
+    db.prepare("SELECT code, name FROM technicians").all().map((t) => [t.code, t.name])
+  );
+  const withNames = activities.map((a) => ({
+    ...a,
+    assigned_codes_list: a.assigned_codes.split(",").filter(Boolean),
+    resolved_names: a.assigned_codes
+      .split(",")
+      .filter(Boolean)
+      .map((c) => nameByCode.get(c) || c),
+  }));
+
+  const stats = { total: withNames.length };
+  for (const a of withNames) {
     stats[a.status] = (stats[a.status] || 0) + 1;
   }
+  stats["Sin clasificar"] = withNames.filter((a) => !a.activity_type).length;
 
-  res.json({ week, activities, stats });
+  res.json({ week, activities: withNames, stats });
+});
+
+// --- Gestion del roster de tecnicos (codigo de Puesto -> nombre + especialidad) ---
+
+router.get("/admin/technicians", adminAuth, (req, res) => {
+  const technicians = db
+    .prepare("SELECT id, code, name, role, active FROM technicians ORDER BY (name IS NULL) DESC, code")
+    .all();
+  res.json(technicians);
+});
+
+router.patch("/admin/technicians/:id", adminAuth, (req, res) => {
+  const { name, role } = req.body || {};
+  if (role && !["Mecanico", "Electrico"].includes(role)) {
+    return res.status(400).json({ error: "Rol invalido. Usa Mecanico o Electrico." });
+  }
+  const technician = db.prepare("SELECT * FROM technicians WHERE id = ?").get(req.params.id);
+  if (!technician) return res.status(404).json({ error: "Tecnico no encontrado." });
+
+  db.prepare("UPDATE technicians SET name = ?, role = ? WHERE id = ?").run(
+    name && name.trim() ? name.trim() : null,
+    role || null,
+    req.params.id
+  );
+  res.json(db.prepare("SELECT id, code, name, role, active FROM technicians WHERE id = ?").get(req.params.id));
 });
 
 export default router;

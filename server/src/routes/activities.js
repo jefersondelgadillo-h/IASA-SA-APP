@@ -46,6 +46,7 @@ router.patch("/activities/:id/status", (req, res) => {
     event: "activity_status_updated",
     activity: {
       id: updated.id,
+      order_number: updated.order_number,
       description: updated.description,
       area: updated.area,
       equipment: updated.equipment,

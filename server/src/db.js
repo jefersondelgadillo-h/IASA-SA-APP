@@ -11,11 +11,16 @@ const db = new Database(path.join(dataDir, "iasa.db"));
 db.pragma("journal_mode = WAL");
 db.pragma("foreign_keys = ON");
 
+// "code" es el codigo de "Puesto" tal cual aparece en el Excel (ej. WPAQUI, DCRUZ).
+// name/role quedan null hasta que el supervisor los complete en el panel admin
+// (seccion Tecnicos): sin eso, ese tecnico no aparece en el login ni se puede
+// clasificar su actividad como Mecanica o Electrica.
 db.exec(`
 CREATE TABLE IF NOT EXISTS technicians (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL UNIQUE,
-  role TEXT NOT NULL CHECK (role IN ('Mecanico', 'Electrico')),
+  code TEXT NOT NULL UNIQUE,
+  name TEXT,
+  role TEXT CHECK (role IS NULL OR role IN ('Mecanico', 'Electrico')),
   active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -27,17 +32,23 @@ CREATE TABLE IF NOT EXISTS weeks (
   uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Cada fila es una "ocurrencia" de una orden de trabajo en un dia especifico
+-- de la semana (el Excel trae una orden por fila con horas planificadas por
+-- dia; cada dia con horas > 0 se convierte en una fila aqui).
 CREATE TABLE IF NOT EXISTS activities (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   week_id INTEGER NOT NULL REFERENCES weeks(id) ON DELETE CASCADE,
+  order_number TEXT,
   activity_date TEXT,
   area TEXT,
   equipment TEXT,
   description TEXT NOT NULL,
-  activity_type TEXT NOT NULL CHECK (activity_type IN ('Mecanico', 'Electrico')),
+  -- Null cuando el/los codigo(s) asignados aun no tienen especialidad
+  -- registrada en "technicians", o cuando mezclan ambas especialidades.
+  activity_type TEXT CHECK (activity_type IS NULL OR activity_type IN ('Mecanico', 'Electrico')),
   assigned_to TEXT,
-  shift TEXT,
-  priority TEXT,
+  assigned_codes TEXT NOT NULL DEFAULT ',',
+  planned_hours REAL,
   status TEXT NOT NULL DEFAULT 'Pendiente' CHECK (status IN ('Pendiente', 'En progreso', 'Completado', 'Con problema')),
   status_comment TEXT,
   status_updated_by TEXT,
@@ -57,7 +68,7 @@ CREATE TABLE IF NOT EXISTS activity_history (
 );
 
 CREATE INDEX IF NOT EXISTS idx_activities_week ON activities(week_id);
-CREATE INDEX IF NOT EXISTS idx_activities_assigned ON activities(assigned_to);
+CREATE INDEX IF NOT EXISTS idx_activities_codes ON activities(assigned_codes);
 CREATE INDEX IF NOT EXISTS idx_history_activity ON activity_history(activity_id);
 `);
 

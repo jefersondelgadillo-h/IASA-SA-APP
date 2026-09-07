@@ -13,6 +13,63 @@ function nextMonday() {
   return monday.toISOString().slice(0, 10);
 }
 
+function TechnicianRow({ technician, onSaved }) {
+  const [name, setName] = useState(technician.name || "");
+  const [role, setRole] = useState(technician.role || "");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+
+  const dirty = name !== (technician.name || "") || role !== (technician.role || "");
+  const incomplete = !technician.name || !technician.role;
+
+  async function handleSave() {
+    setSaving(true);
+    setErr("");
+    try {
+      await onSaved(technician.id, { name: name.trim(), role: role || null });
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <tr className={`border-b last:border-0 ${incomplete ? "bg-amber-50" : ""}`}>
+      <td className="py-2 pr-3 font-mono text-xs whitespace-nowrap">{technician.code}</td>
+      <td className="py-2 pr-3">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Nombre completo"
+          className="w-full border border-gray-300 rounded-lg p-1.5 text-sm"
+        />
+      </td>
+      <td className="py-2 pr-3">
+        <select
+          value={role}
+          onChange={(e) => setRole(e.target.value)}
+          className="w-full border border-gray-300 rounded-lg p-1.5 text-sm"
+        >
+          <option value="">Sin definir</option>
+          <option value="Mecanico">Mecanico</option>
+          <option value="Electrico">Electrico</option>
+        </select>
+      </td>
+      <td className="py-2 pr-3">
+        <button
+          onClick={handleSave}
+          disabled={!dirty || saving}
+          className="text-xs bg-iasa-blue text-white rounded-full px-3 py-1.5 disabled:opacity-40"
+        >
+          {saving ? "..." : "Guardar"}
+        </button>
+        {err && <p className="text-xs text-red-600 mt-1">{err}</p>}
+      </td>
+    </tr>
+  );
+}
+
 export default function Admin() {
   const [password, setPassword] = useState(getAdminPassword() || "");
   const [authed, setAuthed] = useState(!!getAdminPassword());
@@ -23,10 +80,14 @@ export default function Admin() {
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState("");
   const [uploadErr, setUploadErr] = useState("");
+  const [newTechnicianCodes, setNewTechnicianCodes] = useState([]);
 
   const [dashboard, setDashboard] = useState(null);
   const [dashError, setDashError] = useState("");
   const [statusFilter, setStatusFilter] = useState("Todos");
+
+  const [technicians, setTechnicians] = useState([]);
+  const [techError, setTechError] = useState("");
 
   async function handleLogin() {
     setLoginError("");
@@ -55,8 +116,21 @@ export default function Admin() {
     }
   }
 
+  async function loadTechnicians() {
+    setTechError("");
+    try {
+      const data = await api.adminGetTechnicians(getAdminPassword());
+      setTechnicians(data);
+    } catch (err) {
+      setTechError(err.message);
+    }
+  }
+
   useEffect(() => {
-    if (authed) loadDashboard();
+    if (authed) {
+      loadDashboard();
+      loadTechnicians();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authed]);
 
@@ -66,16 +140,24 @@ export default function Admin() {
     setUploading(true);
     setUploadMsg("");
     setUploadErr("");
+    setNewTechnicianCodes([]);
     try {
       const res = await api.adminUpload(getAdminPassword(), file, weekStart);
       setUploadMsg(`Cargado: ${res.activities_loaded} actividades para la semana ${res.week_start}.`);
+      setNewTechnicianCodes(res.new_technicians || []);
       setFile(null);
       loadDashboard();
+      loadTechnicians();
     } catch (err) {
       setUploadErr(err.message);
     } finally {
       setUploading(false);
     }
+  }
+
+  async function handleSaveTechnician(id, body) {
+    const updated = await api.adminUpdateTechnician(getAdminPassword(), id, body);
+    setTechnicians((prev) => prev.map((t) => (t.id === id ? updated : t)));
   }
 
   if (!authed) {
@@ -105,6 +187,7 @@ export default function Admin() {
 
   const activities =
     dashboard?.activities.filter((a) => statusFilter === "Todos" || a.status === statusFilter) || [];
+  const incompleteCount = technicians.filter((t) => !t.name || !t.role).length;
 
   return (
     <div className="min-h-screen bg-gray-100 pb-10">
@@ -154,6 +237,13 @@ export default function Admin() {
             </button>
             {uploadMsg && <p className="text-sm text-green-700">{uploadMsg}</p>}
             {uploadErr && <p className="text-sm text-red-600">{uploadErr}</p>}
+            {newTechnicianCodes.length > 0 && (
+              <p className="text-sm text-amber-700 bg-amber-50 rounded-lg p-2">
+                Se detectaron {newTechnicianCodes.length} codigo(s) nuevo(s) sin nombre registrado:{" "}
+                <strong>{newTechnicianCodes.join(", ")}</strong>. Completalos abajo en "Tecnicos" para que puedan
+                iniciar sesion y para que sus actividades se clasifiquen correctamente.
+              </p>
+            )}
           </form>
         </section>
 
@@ -177,6 +267,11 @@ export default function Admin() {
               <span className="text-xs bg-gray-100 rounded-full px-3 py-1">
                 Total: <strong>{dashboard.stats.total || 0}</strong>
               </span>
+              {dashboard.stats["Sin clasificar"] > 0 && (
+                <span className="text-xs bg-amber-100 text-amber-800 rounded-full px-3 py-1">
+                  Sin clasificar: <strong>{dashboard.stats["Sin clasificar"]}</strong>
+                </span>
+              )}
             </div>
           )}
 
@@ -195,14 +290,16 @@ export default function Admin() {
           </div>
 
           <div className="overflow-x-auto -mx-4 px-4">
-            <table className="w-full text-sm min-w-[720px]">
+            <table className="w-full text-sm min-w-[820px]">
               <thead>
                 <tr className="text-left text-gray-500 border-b">
                   <th className="py-2 pr-3">Fecha</th>
+                  <th className="py-2 pr-3">Orden</th>
                   <th className="py-2 pr-3">Tipo</th>
                   <th className="py-2 pr-3">Actividad</th>
                   <th className="py-2 pr-3">Area / Equipo</th>
                   <th className="py-2 pr-3">Responsable</th>
+                  <th className="py-2 pr-3">Horas</th>
                   <th className="py-2 pr-3">Estado</th>
                   <th className="py-2 pr-3">Comentario</th>
                   <th className="py-2 pr-3">Actualizado</th>
@@ -212,10 +309,14 @@ export default function Admin() {
                 {activities.map((a) => (
                   <tr key={a.id} className="border-b last:border-0 align-top">
                     <td className="py-2 pr-3 whitespace-nowrap">{a.activity_date || "-"}</td>
-                    <td className="py-2 pr-3 whitespace-nowrap">{a.activity_type === "Mecanico" ? "Mecanico" : "Electrico"}</td>
+                    <td className="py-2 pr-3 whitespace-nowrap text-xs text-gray-500">{a.order_number || "-"}</td>
+                    <td className="py-2 pr-3 whitespace-nowrap">{a.activity_type || "Sin clasificar"}</td>
                     <td className="py-2 pr-3">{a.description}</td>
                     <td className="py-2 pr-3">{[a.area, a.equipment].filter(Boolean).join(" · ")}</td>
-                    <td className="py-2 pr-3 whitespace-nowrap">{a.assigned_to || "-"}</td>
+                    <td className="py-2 pr-3 whitespace-nowrap">
+                      {(a.resolved_names || []).join(", ") || a.assigned_to || "-"}
+                    </td>
+                    <td className="py-2 pr-3 whitespace-nowrap">{a.planned_hours ?? "-"}</td>
                     <td className="py-2 pr-3">
                       <StatusBadge status={a.status} />
                     </td>
@@ -229,8 +330,48 @@ export default function Admin() {
                 ))}
                 {activities.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="py-6 text-center text-gray-400">
+                    <td colSpan={10} className="py-6 text-center text-gray-400">
                       No hay actividades para mostrar.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className="bg-white rounded-2xl shadow-sm p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-semibold">
+              Tecnicos {incompleteCount > 0 && <span className="text-amber-600">({incompleteCount} por completar)</span>}
+            </h2>
+            <button onClick={loadTechnicians} className="text-xs text-iasa-blue underline">
+              Actualizar
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mb-3">
+            El codigo viene del Excel (columna "Puesto"). Completa el nombre y la especialidad para que ese tecnico
+            pueda iniciar sesion en la app y sus actividades se clasifiquen correctamente.
+          </p>
+          {techError && <p className="text-sm text-red-600 mb-2">{techError}</p>}
+          <div className="overflow-x-auto -mx-4 px-4">
+            <table className="w-full text-sm min-w-[520px]">
+              <thead>
+                <tr className="text-left text-gray-500 border-b">
+                  <th className="py-2 pr-3">Codigo</th>
+                  <th className="py-2 pr-3">Nombre</th>
+                  <th className="py-2 pr-3">Especialidad</th>
+                  <th className="py-2 pr-3"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {technicians.map((t) => (
+                  <TechnicianRow key={t.id} technician={t} onSaved={handleSaveTechnician} />
+                ))}
+                {technicians.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="py-6 text-center text-gray-400">
+                      Todavia no hay tecnicos. Suben un Excel para detectarlos automaticamente.
                     </td>
                   </tr>
                 )}

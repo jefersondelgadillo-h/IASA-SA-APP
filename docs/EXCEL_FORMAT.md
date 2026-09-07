@@ -1,51 +1,87 @@
-# Formato esperado del Excel semanal
+# Formato del Excel semanal
 
-La app lee el Excel que llega cada lunes por Outlook y lo convierte en la
-programacion de la semana. Para que la carga funcione sin ajustes, la
-primera fila de la hoja debe tener encabezados de columna, por ejemplo:
+Este documento describe el Excel real que llega cada lunes (tipo
+"Programa SEM##"), verificado contra los archivos de las semanas 36 y
+37 de 2026.
 
-| Fecha | Area | Equipo | Actividad | Tipo | Responsable | Turno | Prioridad |
-|-------|------|--------|-----------|------|-------------|-------|-----------|
-| 2026-09-07 | Envasado | Llenadora 3 | Cambio de rodamientos | Mecanico | Juan Perez | Dia | Alta |
-| 2026-09-07 | Envasado | Tablero TP-1 | Revision de breakers | Electrico | Ana Gomez | Noche | Media |
+## Estructura
 
-**Columnas obligatorias:** `Actividad` (la descripcion de la tarea) y
-`Tipo` (debe decir "Mecanico" o "Electrico" para que la actividad se
-asigne a la vista correcta).
+Una sola hoja, con una fila de encabezados y luego una fila por cada
+**orden de trabajo**:
 
-**Columnas opcionales pero recomendadas:** `Fecha`, `Area`, `Equipo`,
-`Responsable` (nombre del tecnico), `Turno`, `Prioridad`.
+| Sector | Orden | Equipo | Descripción | Puesto | Inicio | Fin | Dur. | Mon 31 | Tue 01 | Wed 02 | Thu 03 | Fri 04 | Sat 05 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| APT | 204154422 | Reductor 6,8KW ... | Cambiar Aceite al Reductor. | WCASTELL | 01/09 | 01/09 | 1 | | 1 | | | | |
+| ENSCR | 204180842 | Balanza Ensacadora Crown | CALIBRACIÓN BL 002 | DCRUZ | 05/09 | 05/09 | 5 | | | | | | 5 |
 
-## Si los nombres de columna en el archivo real son distintos
+- **Sector**: zona/area de la planta (código corto, puede venir vacío).
+- **Orden**: número de orden de trabajo.
+- **Equipo**: equipo/máquina (a veces viene vacío).
+- **Descripción**: la tarea (obligatoria).
+- **Puesto**: código del técnico o equipo asignado (obligatorio). Puede
+  traer **varios códigos separados por "/"** cuando la orden la hacen
+  varias personas (ej. `CRIOS/EVARGAS/WHUACARA`).
+- **Inicio / Fin / Dur.**: rango y duración total de la orden. La app
+  no los usa para nada — las fechas reales salen de las columnas de
+  día (ver abajo).
+- **Columnas de día** (`Mon 31`, `Tue 01`, ...): una por cada día de la
+  semana, con las **horas planificadas** ese día para esa orden. La
+  app ignora el texto del encabezado (a veces viene como texto "Mon
+  31", a veces como fecha real) y simplemente asume que son días
+  consecutivos empezando el lunes que se indica al subir el archivo en
+  el panel admin.
 
-No es necesario cambiar el codigo. Edita el archivo
-`server/config/excel-mapping.json` y agrega el nombre exacto de la
-columna tal como aparece en el Excel a la lista correspondiente. Por
-ejemplo, si la columna de responsable en el archivo real se llama
-"Encargado", agrega `"Encargado"` a la lista `responsable`.
+## Cómo lo convierte la app
 
-## Formato de fecha
+Por cada fila del Excel, la app genera **una actividad por cada día
+que tenga horas planificadas mayores a 0**. Por ejemplo, una orden con
+horas en Lunes, Martes y Jueves genera 3 actividades (una por día),
+cada una con su propio estado y comentario — así un técnico puede
+marcar "Completado" el lunes aunque la misma orden siga pendiente el
+jueves.
 
-Acepta fechas de Excel (celda tipo fecha), o texto en formato
-`dd/mm/aaaa` o `aaaa-mm-dd`.
+## Lo más importante: el Excel NO dice si una tarea es Mecánica o Eléctrica
 
-## Columna "Tipo"
+A diferencia de lo que se asumió en una primera version de esta app,
+el archivo real **no trae una columna de especialidad**. Lo único que
+identifica quién hace la tarea es el código de "Puesto" (ej. `WPAQUI`,
+`DCRUZ`, `CRIOS`...).
 
-Se reconoce automaticamente si el valor es alguna variante de
-"Mecanico" o "Electrico" (con o sin tilde, mayusculas/minusculas,
-abreviado "MEC"/"ELEC"/"M"/"E"). Las filas que no se puedan clasificar
-como Mecanico o Electrico se omiten de la carga (por ejemplo,
-subtitulos o filas en blanco dentro del Excel).
+Por eso, la especialidad (Mecánico/Eléctrico) de cada actividad se
+calcula así:
 
-## Que pasa si subo el Excel de una semana que ya existia
+1. En el panel admin hay una sección **"Técnicos"** con todos los
+   códigos que se han visto en los Excel cargados.
+2. El supervisor completa **nombre completo y especialidad** para cada
+   código, una sola vez (o cuando aparece un código nuevo).
+3. Desde ese momento, cualquier actividad asignada a ese código se
+   clasifica automáticamente. Si una orden tiene varios códigos y
+   todos son de la misma especialidad, la actividad queda clasificada;
+   si mezcla Mecánico y Eléctrico, o si algún código todavía no tiene
+   especialidad registrada, la actividad queda como **"Sin
+   clasificar"** (igual es visible en el panel admin y para el propio
+   técnico asignado, solo que no aparece en el filtro general por
+   especialidad hasta completar el roster).
 
-El sistema reemplaza por completo las actividades de esa semana
-(identificada por la fecha de inicio de semana que se indica al
-subir el archivo). Es seguro volver a subir el mismo archivo corregido.
+**Cada vez que se sube un Excel, los códigos de "Puesto" que no
+estén todavía en la lista de técnicos se agregan automáticamente**
+(sin nombre ni especialidad) para que el supervisor solo tenga que
+completarlos, no escribirlos desde cero.
 
-## Tecnicos
+Los dos códigos `PDF-MEC` y `PDF-ELEC` (limpieza de talleres) son
+genéricos, no personas — se puede poner un nombre como "Taller
+Mecánico" / "Taller Eléctrico" y su especialidad correspondiente.
 
-Los nombres que aparecen en la columna `Responsable` se guardan
-automaticamente en la lista de tecnicos que aparece al iniciar sesion
-en la app, junto con su rol (Mecanico/Electrico). No hace falta
-registrarlos a mano.
+## Si los nombres de columna cambian
+
+Editando `server/config/excel-mapping.json` (sin tocar código) se
+puede ajustar a qué encabezados busca la app para Sector / Orden /
+Equipo / Descripción / Puesto / Duración. Las columnas de día siempre
+se toman como todas las columnas con encabezado no vacío que vienen
+después de la columna de Duración.
+
+## Volver a subir una semana
+
+Subir el Excel de una semana que ya existía reemplaza por completo sus
+actividades (identificadas por la fecha de inicio de semana que se
+indica al subir). Es seguro volver a subir el mismo archivo corregido.

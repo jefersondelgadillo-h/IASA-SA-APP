@@ -43,12 +43,20 @@ la misma red, usando la IP de la maquina).
    administrador (definida en `server/.env`), sube el Excel de la
    semana indicando la fecha del lunes de inicio. Ver el formato
    esperado en [`docs/EXCEL_FORMAT.md`](docs/EXCEL_FORMAT.md).
-2. **Mecanicos y electricos:** entran a la app, eligen su rol y su
-   nombre (una sola vez, queda guardado en el dispositivo), y ven solo
-   las actividades de su especialidad. Pueden filtrar "solo mis
-   actividades" o por estado, y tocar cualquier actividad para
-   actualizar su estado y dejar un comentario.
-3. **Notificaciones automaticas:** cada actualizacion dispara (si esta
+2. **Completar la lista de tecnicos:** el Excel real no dice si una
+   tarea es Mecanica o Electrica, solo trae un codigo de tecnico
+   (columna "Puesto"). Cada codigo nuevo que aparece en un Excel se
+   agrega automaticamente a la seccion **"Tecnicos"** del panel admin;
+   ahi el supervisor completa el nombre completo y la especialidad de
+   cada uno (una sola vez por persona). Sin ese paso, ese tecnico no
+   puede iniciar sesion y sus actividades quedan como "Sin clasificar".
+3. **Mecanicos y electricos:** entran a la app, eligen su rol y su
+   nombre (una sola vez, queda guardado en el dispositivo), y ven por
+   defecto solo sus propias actividades de la semana. Pueden apagar ese
+   filtro para ver todas las de su especialidad, filtrar por estado, y
+   tocar cualquier actividad para actualizar su estado y dejar un
+   comentario.
+4. **Notificaciones automaticas:** cada actualizacion dispara (si esta
    configurada) un flujo de Power Automate. Guia paso a paso en
    [`docs/POWER_AUTOMATE.md`](docs/POWER_AUTOMATE.md).
 

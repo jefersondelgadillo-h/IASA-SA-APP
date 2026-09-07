@@ -30,11 +30,12 @@ generar el esquema"** y pega este ejemplo:
   "event": "activity_status_updated",
   "activity": {
     "id": 123,
+    "order_number": "204178453",
     "description": "Cambio de rodamientos",
     "area": "Envasado",
     "equipment": "Llenadora 3",
     "activity_type": "Mecanico",
-    "assigned_to": "Juan Perez",
+    "assigned_to": "WPAQUI",
     "activity_date": "2026-09-07"
   },
   "old_status": "Pendiente",
@@ -54,7 +55,8 @@ selector de "contenido dinamico").
 Agrega un paso nuevo, por ejemplo:
 
 - **Enviar un correo electronico (V2)** (Office 365 Outlook), con
-  destinatario tu correo o el de mantenimiento, o
+  destinatario **PRA_JDelgadilloH@IASA-SA.COM** (o el correo/lista que
+  prefieras usar para recibir estos avisos), o
 - **Publicar un mensaje en un canal de Microsoft Teams**.
 
 Sugerencia de cuerpo del mensaje/correo, usando contenido dinamico:
@@ -63,7 +65,8 @@ Sugerencia de cuerpo del mensaje/correo, usando contenido dinamico:
 Asunto: [Mantenimiento IASA] Actualizacion: {activity.description}
 
 {updated_by} actualizo la actividad "{activity.description}"
-({activity.area} - {activity.equipment}) de {old_status} a {new_status}.
+(orden {activity.order_number}, {activity.area} - {activity.equipment})
+de {old_status} a {new_status}.
 
 Comentario: {comment}
 Fecha de la actividad: {activity.activity_date}
