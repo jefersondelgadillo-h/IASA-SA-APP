@@ -70,7 +70,21 @@ completarlos, no escribirlos desde cero.
 
 Los dos códigos `PDF-MEC` y `PDF-ELEC` (limpieza de talleres) son
 genéricos, no personas — se puede poner un nombre como "Taller
-Mecánico" / "Taller Eléctrico" y su especialidad correspondiente.
+Mecánico" / "Taller Eléctrico" y su especialidad correspondiente. Lo
+mismo pasa con `ELECTRIT`: no es una persona fija, es "cualquier
+eléctrico del taller que este disponible" en ese momento.
+
+## Roster inicial ya cargado
+
+`server/config/technicians-seed.json` trae precargado el roster real
+de la planta Don Felipe (confirmado por el supervisor a partir de las
+semanas 36 y 37 de 2026: 20 personas/códigos genéricos, con sus alias
+conocidos). Se aplica solo una vez por código, la primera vez que
+arranca el servidor — nunca pisa un nombre o rol que ya se haya
+editado desde el panel admin. Para agregar gente nueva de ahí en
+adelante no hace falta tocar este archivo: los códigos nuevos se
+detectan solos al subir cada Excel y se completan desde "Técnicos" en
+el panel admin.
 
 ## El rol no tiene que ser Mecánico o Eléctrico
 

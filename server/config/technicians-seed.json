@@ -1,0 +1,25 @@
+{
+  "_comment": "Roster inicial confirmado por el supervisor (IASA SA, planta Don Felipe) a partir de los Excel de las semanas 36 y 37 de 2026. Se carga automaticamente la primera vez que aparece cada codigo (nunca sobrescribe un nombre/rol ya editado desde el panel admin). Para agregar gente nueva de ahi en adelante, usar el panel admin directamente -no hace falta tocar este archivo-.",
+  "technicians": [
+    { "name": "German Urey", "role": "Electrico", "codes": ["GUREY"] },
+    { "name": "Pedro Velasco", "role": "Electrico", "codes": ["PVELASCO"] },
+    { "name": "Hernan Cabrera", "role": "Electrico", "codes": ["HCABRERA", "HCA"] },
+    { "name": "Jose Carrasco", "role": "Supervisor", "codes": ["JCARRASC"] },
+    { "name": "Mauricio Rivera", "role": "Mantenimiento", "codes": ["MRIVERA"] },
+    { "name": "Electricos (equipo)", "role": "Electrico", "codes": ["PDF-ELEC"] },
+    { "name": "Mecanicos (equipo)", "role": "Mecanico", "codes": ["PDF-MEC"] },
+    { "name": "Rene Ticona", "role": "Mecanico", "codes": ["RTICONA", "RTI"] },
+    { "name": "Willy Huacara", "role": "Mecanico", "codes": ["WHU", "WHUACARA"] },
+    { "name": "Samuel Saucedo", "role": "Supervisor", "codes": ["SSAUCEDO"] },
+    { "name": "Waldo Castellon", "role": "Mecanico", "codes": ["WCASTELL"] },
+    { "name": "Boris Herbas", "role": "Supervisor", "codes": ["BHERBAS"] },
+    { "name": "Demetrio Cruz", "role": "Electrico", "codes": ["DCRUZ"] },
+    { "name": "Walter Paqui", "role": "Mecanico", "codes": ["WPAQUI", "WPA"] },
+    { "name": "Edgar Camacho", "role": "Electrico", "codes": ["ECAMACHO", "ECAM"] },
+    { "name": "Edwin Vargas", "role": "Mecanico", "codes": ["EVARGAS"] },
+    { "name": "Cesar Rios", "role": "Mecanico", "codes": ["CRI", "CRIOS"] },
+    { "name": "Neyer Ferrufino", "role": "Supervisor", "codes": ["NFERRUFI"] },
+    { "name": "Bryan Garcia", "role": "Mecanico", "codes": ["BGARCIA", "BGA"] },
+    { "name": "Electricista disponible (turno)", "role": "Electrico", "codes": ["ELECTRIT"] }
+  ]
+}

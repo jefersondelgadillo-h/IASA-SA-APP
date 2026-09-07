@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { seedTechnicians } from "./services/seedTechnicians.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.join(__dirname, "..", "data");
@@ -73,5 +74,7 @@ CREATE INDEX IF NOT EXISTS idx_activities_week ON activities(week_id);
 CREATE INDEX IF NOT EXISTS idx_activities_codes ON activities(assigned_codes);
 CREATE INDEX IF NOT EXISTS idx_history_activity ON activity_history(activity_id);
 `);
+
+seedTechnicians(db);
 
 export default db;
