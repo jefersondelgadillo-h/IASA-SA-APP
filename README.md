@@ -60,6 +60,29 @@ la misma red, usando la IP de la maquina).
    configurada) un flujo de Power Automate. Guia paso a paso en
    [`docs/POWER_AUTOMATE.md`](docs/POWER_AUTOMATE.md).
 
+## Probar en linea rapido (Render, plan gratis)
+
+Para probar la app desde el celular sin instalar nada localmente:
+
+1. Entra a https://render.com y crea una cuenta (puedes usar el mismo
+   GitHub).
+2. **New +** → **Blueprint** → selecciona el repo `IASA-SA-APP` (rama
+   `claude/iasa-maintenance-scheduling-app-aru75b`). Render detecta el
+   archivo `render.yaml` de la raiz y prepara el servicio solo.
+3. Cuando pida las variables marcadas como secretas, completa:
+   - `ADMIN_PASSWORD`: la clave que quieras usar para el panel admin.
+   - `POWER_AUTOMATE_WEBHOOK_URL`: puedes dejarla vacia por ahora.
+4. **Apply** / **Deploy**. En unos minutos queda una URL publica tipo
+   `https://iasa-mantenimiento.onrender.com` — esa es la que abres
+   desde el celular.
+
+**Importante:** el plan gratis de Render usa disco efimero: si el
+servicio se reinicia (por inactividad, o al volver a desplegar), se
+pierde lo que se haya subido (Excel, cambios de estado) y solo queda
+el roster inicial precargado. Sirve perfecto para probar la
+interfaz y el flujo, pero para el uso real semanal conviene un plan
+con disco persistente, o correrlo en un servidor propio (ver abajo).
+
 ## Despliegue (produccion)
 
 La forma mas simple es correr todo en un solo servidor Node:

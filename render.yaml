@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: iasa-mantenimiento
+    runtime: node
+    plan: free
+    branch: claude/iasa-maintenance-scheduling-app-aru75b
+    buildCommand: cd client && npm install && npm run build && cd ../server && npm install
+    startCommand: cd server && npm start
+    envVars:
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: POWER_AUTOMATE_WEBHOOK_URL
+        sync: false
+      - key: CLIENT_ORIGIN
+        value: "*"
