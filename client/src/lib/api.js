@@ -26,7 +26,7 @@ export const api = {
   updateStatus: (id, body) =>
     request(`/activities/${id}/status`, { method: "PATCH", body: JSON.stringify(body) }),
   getHistory: (id) => request(`/activities/${id}/history`),
-  getIndicators: () => request("/indicators"),
+  getIndicators: (week) => request(`/indicators${week ? `?week=${week}` : ""}`),
 
   adminLogin: (password) =>
     request("/admin/login", { method: "POST", headers: { "x-admin-password": password } }),

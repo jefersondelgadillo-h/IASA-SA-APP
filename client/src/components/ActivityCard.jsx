@@ -29,7 +29,14 @@ export default function ActivityCard({ activity, onClick }) {
     >
       <div className="flex items-start justify-between gap-2 mb-1">
         <h3 className="font-semibold text-gray-900 leading-snug">{activity.description}</h3>
-        <StatusBadge status={activity.status} />
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <StatusBadge status={activity.status} />
+          {activity._week && (
+            <span className="text-[10px] font-semibold text-amber-700 bg-amber-100 rounded-full px-2 py-0.5 whitespace-nowrap">
+              Semana {activity._week}
+            </span>
+          )}
+        </div>
       </div>
       <p className="text-sm text-gray-500">
         {[activity.area, activity.equipment].filter(Boolean).join(" · ") || "Sin area/equipo"}

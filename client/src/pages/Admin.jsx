@@ -178,6 +178,8 @@ export default function Admin() {
   const [dashboard, setDashboard] = useState(null);
   const [dashError, setDashError] = useState("");
   const [statusFilter, setStatusFilter] = useState("Todos");
+  const [weeksList, setWeeksList] = useState([]);
+  const [dashboardWeek, setDashboardWeek] = useState(null);
 
   const [technicians, setTechnicians] = useState([]);
   const [techError, setTechError] = useState("");
@@ -205,13 +207,22 @@ export default function Admin() {
     setPassword("");
   }
 
-  async function loadDashboard() {
+  async function loadDashboard(week) {
     setDashError("");
     try {
-      const data = await api.adminDashboard(getAdminPassword());
+      const data = await api.adminDashboard(getAdminPassword(), week);
       setDashboard(data);
+      setDashboardWeek(data.week);
     } catch (err) {
       setDashError(err.message);
+    }
+  }
+
+  async function loadWeeksList() {
+    try {
+      setWeeksList(await api.getWeeks());
+    } catch {
+      setWeeksList([]);
     }
   }
 
@@ -244,6 +255,7 @@ export default function Admin() {
       loadDashboard();
       loadTechnicians();
       loadIndicators();
+      loadWeeksList();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authed]);
@@ -260,8 +272,9 @@ export default function Admin() {
       setUploadMsg(`Cargado: ${res.activities_loaded} actividades para la semana ${res.week_start}.`);
       setNewTechnicianCodes(res.new_technicians || []);
       setFile(null);
-      loadDashboard();
+      loadDashboard(res.week_start);
       loadTechnicians();
+      loadWeeksList();
     } catch (err) {
       setUploadErr(err.message);
     } finally {
@@ -429,13 +442,29 @@ export default function Admin() {
         <section className="bg-white rounded-2xl shadow-sm p-4">
           <SectionHeader
             icon="📊"
-            title={`Tablero de la semana ${dashboard?.week || ""}`}
+            title="Tablero de mantenimiento"
             action={
-              <button onClick={loadDashboard} className="text-xs text-iasa-blue underline">
+              <button onClick={() => loadDashboard(dashboardWeek)} className="text-xs text-iasa-blue underline">
                 Actualizar
               </button>
             }
           />
+          {weeksList.length > 1 && (
+            <label className="flex items-center gap-2 text-xs text-gray-500 mb-3">
+              Semana
+              <select
+                value={dashboard?.week || ""}
+                onChange={(e) => loadDashboard(e.target.value)}
+                className="border border-gray-300 rounded-lg px-2 py-1 text-xs"
+              >
+                {weeksList.map((w) => (
+                  <option key={w.week_start} value={w.week_start}>
+                    {w.week_start}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           {dashboard?.uploaded_at && (
             <p className="text-xs text-gray-400 mb-3">
               Cargado el {new Date(dashboard.uploaded_at).toLocaleString()}
