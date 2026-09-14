@@ -210,18 +210,32 @@ router.get("/admin/export", adminAuth, (req, res) => {
 
 // Indicadores de gestion que no vienen del Excel (Fallas de Equipos, Cumplimiento
 // al Programa de Mantenimiento Anual): el supervisor los carga a mano aqui,
-// tomandolos de su reporte de Power BI/SAP semanal.
+// una fila por semana, tomandolos de su reporte de Power BI/SAP semanal. Se
+// puede cargar o corregir cualquier semana (pasada o actual) que ya tenga
+// programacion subida.
 router.patch("/admin/indicators", adminAuth, (req, res) => {
-  const { fallas_equipos_pct, fallas_equipos_meta, cumplimiento_anual_pct, cumplimiento_anual_meta } =
+  const { week, fallas_equipos_pct, fallas_equipos_meta, cumplimiento_anual_pct, cumplimiento_anual_meta } =
     req.body || {};
+  if (!week) return res.status(400).json({ error: "Falta indicar la semana." });
+
+  const weekRow = db.prepare("SELECT week_start FROM weeks WHERE week_start = ?").get(week);
+  if (!weekRow) return res.status(400).json({ error: "Esa semana no tiene programacion cargada todavia." });
+
   const now = new Date().toISOString();
 
   db.prepare(
-    `UPDATE company_indicators
-     SET fallas_equipos_pct = ?, fallas_equipos_meta = ?, cumplimiento_anual_pct = ?, cumplimiento_anual_meta = ?,
-         updated_at = ?, updated_by = ?
-     WHERE id = 1`
+    `INSERT INTO week_indicators
+       (week_start, fallas_equipos_pct, fallas_equipos_meta, cumplimiento_anual_pct, cumplimiento_anual_meta, updated_at, updated_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(week_start) DO UPDATE SET
+       fallas_equipos_pct = excluded.fallas_equipos_pct,
+       fallas_equipos_meta = excluded.fallas_equipos_meta,
+       cumplimiento_anual_pct = excluded.cumplimiento_anual_pct,
+       cumplimiento_anual_meta = excluded.cumplimiento_anual_meta,
+       updated_at = excluded.updated_at,
+       updated_by = excluded.updated_by`
   ).run(
+    week,
     fallas_equipos_pct === "" || fallas_equipos_pct == null ? null : Number(fallas_equipos_pct),
     fallas_equipos_meta == null || fallas_equipos_meta === "" ? 3 : Number(fallas_equipos_meta),
     cumplimiento_anual_pct === "" || cumplimiento_anual_pct == null ? null : Number(cumplimiento_anual_pct),
@@ -230,7 +244,19 @@ router.patch("/admin/indicators", adminAuth, (req, res) => {
     "Supervisor"
   );
 
-  res.json(db.prepare("SELECT * FROM company_indicators WHERE id = 1").get());
+  res.json(db.prepare("SELECT * FROM week_indicators WHERE week_start = ?").get(week));
+});
+
+// Elimina por completo la programacion de una semana (actividades, su
+// historial de cambios y sus indicadores manuales caen en cascada). No se
+// puede deshacer: el frontend pide confirmacion antes de llamar esto.
+router.delete("/admin/weeks/:week_start", adminAuth, (req, res) => {
+  const { week_start } = req.params;
+  const weekRow = db.prepare("SELECT id FROM weeks WHERE week_start = ?").get(week_start);
+  if (!weekRow) return res.status(404).json({ error: "Esa semana no existe." });
+
+  db.prepare("DELETE FROM weeks WHERE id = ?").run(weekRow.id);
+  res.json({ ok: true, week_start });
 });
 
 router.patch("/admin/technicians/:id", adminAuth, (req, res) => {
