@@ -10,6 +10,11 @@ import CompanyIndicators from "../components/CompanyIndicators.jsx";
 
 const STATUS_FILTERS = ["Todos", "Pendiente", "En progreso", "Completado", "Con problema"];
 
+// Prioridad para elegir el estado "representativo" cuando una misma orden
+// (mismo numero de orden + mismo responsable) tiene horas en varios dias:
+// se muestra el mas urgente de sus ocurrencias.
+const STATUS_PRIORITY = ["Con problema", "En progreso", "Pendiente", "Completado"];
+
 const DAY_NAMES = ["Domingo", "Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado"];
 
 function formatDay(dateStr) {
@@ -27,6 +32,43 @@ function timeAgo(date) {
   if (minutes < 60) return `actualizado hace ${minutes} min`;
   const hours = Math.floor(minutes / 60);
   return `actualizado hace ${hours} h`;
+}
+
+// Una misma orden de trabajo puede tener horas planificadas en varios dias
+// (una fila de "actividades" por dia). Se fusionan aqui las que comparten
+// orden + responsable en una sola tarjeta: se reporta una vez y el cambio
+// se aplica a todas sus ocurrencias.
+function mergeActivities(list) {
+  const map = new Map();
+  for (const a of list) {
+    const key = a.order_number ? `${a.order_number}::${a.assigned_codes}` : `single-${a.id}`;
+    if (!map.has(key)) {
+      map.set(key, {
+        ...a,
+        ids: [a.id],
+        dates: a.activity_date ? [a.activity_date] : [],
+        datesById: { [a.id]: a.activity_date },
+        planned_hours: a.planned_hours || 0,
+        _latestUpdate: a.status_updated_at,
+      });
+    } else {
+      const g = map.get(key);
+      g.ids.push(a.id);
+      if (a.activity_date) g.dates.push(a.activity_date);
+      g.datesById[a.id] = a.activity_date;
+      g.planned_hours += a.planned_hours || 0;
+      // estado representativo: el mas urgente entre las ocurrencias de esta orden
+      if (STATUS_PRIORITY.indexOf(a.status) < STATUS_PRIORITY.indexOf(g.status)) {
+        g.status = a.status;
+      }
+      // comentario: el de la actualizacion mas reciente
+      if (!g._latestUpdate || (a.status_updated_at && a.status_updated_at > g._latestUpdate)) {
+        g._latestUpdate = a.status_updated_at;
+        g.status_comment = a.status_comment;
+      }
+    }
+  }
+  return [...map.values()].map((g) => ({ ...g, dates: [...new Set(g.dates)].sort() }));
 }
 
 export default function Schedule({ technician, onChangeUser }) {
@@ -78,29 +120,35 @@ export default function Schedule({ technician, onChangeUser }) {
     });
   }, [activities, onlyMine, technician.codes, technician.role]);
 
+  // Se fusiona antes de filtrar por estado: asi el filtro se aplica al estado
+  // representativo de cada orden (no deja "sueltas" ocurrencias de la misma
+  // orden en dias que no calzan con el filtro).
+  const mergedScoped = useMemo(() => mergeActivities(scoped), [scoped]);
+
   const counts = useMemo(() => {
     const c = { Pendiente: 0, "En progreso": 0, Completado: 0, "Con problema": 0 };
-    for (const a of scoped) c[a.status] = (c[a.status] || 0) + 1;
+    for (const a of mergedScoped) c[a.status] = (c[a.status] || 0) + 1;
     return c;
-  }, [scoped]);
+  }, [mergedScoped]);
 
-  const filtered = useMemo(() => {
-    return scoped.filter((a) => statusFilter === "Todos" || a.status === statusFilter);
-  }, [scoped, statusFilter]);
+  const merged = useMemo(() => {
+    return mergedScoped.filter((a) => statusFilter === "Todos" || a.status === statusFilter);
+  }, [mergedScoped, statusFilter]);
 
   const grouped = useMemo(() => {
     const map = new Map();
-    for (const a of filtered) {
-      const key = a.activity_date || "Sin fecha";
+    for (const a of merged) {
+      const key = a.dates[0] || "Sin fecha";
       if (!map.has(key)) map.set(key, []);
       map.get(key).push(a);
     }
     return [...map.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-  }, [filtered]);
+  }, [merged]);
 
-  async function handleSaveStatus(id, body) {
-    const updated = await api.updateStatus(id, body);
-    setActivities((prev) => prev.map((a) => (a.id === id ? { ...a, ...updated } : a)));
+  async function handleSaveStatus(ids, body) {
+    const updates = await Promise.all(ids.map((id) => api.updateStatus(id, body)));
+    const byId = new Map(updates.map((u) => [u.id, u]));
+    setActivities((prev) => prev.map((a) => (byId.has(a.id) ? { ...a, ...byId.get(a.id) } : a)));
   }
 
   return (
@@ -160,10 +208,10 @@ export default function Schedule({ technician, onChangeUser }) {
         )}
         {error && <p className="text-center text-red-600 mt-10">{error}</p>}
 
-        {!loading && !error && scoped.length > 0 && (
+        {!loading && !error && mergedScoped.length > 0 && (
           <section className="bg-white rounded-2xl shadow-sm p-4">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Tu avance esta semana</p>
-            <ProgressBar label="Completado" value={counts.Completado} total={scoped.length} tone="green" />
+            <ProgressBar label="Completado" value={counts.Completado} total={mergedScoped.length} tone="green" />
             <div className="grid grid-cols-4 gap-2 mt-3">
               <StatTile label="Pendiente" value={counts.Pendiente} />
               <StatTile label="En progreso" value={counts["En progreso"]} tone="amber" />
