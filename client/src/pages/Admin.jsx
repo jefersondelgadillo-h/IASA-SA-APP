@@ -8,6 +8,7 @@ import StatTile from "../components/StatTile.jsx";
 import ProgressBar from "../components/ProgressBar.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import CompanyIndicators from "../components/CompanyIndicators.jsx";
+import Logo from "../components/Logo.jsx";
 
 const STATUS_TONES = { Pendiente: "gray", "En progreso": "amber", Completado: "green", "Con problema": "red" };
 
@@ -297,7 +298,10 @@ export default function Admin() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 px-6">
         <div className="w-full max-w-sm bg-white rounded-2xl shadow p-6">
-          <h1 className="text-lg font-bold mb-4">Panel de administracion</h1>
+          <div className="flex justify-center mb-4">
+            <Logo className="h-12" fallbackClassName="text-lg font-bold" />
+          </div>
+          <h1 className="text-lg font-bold mb-4 text-center">Panel de administracion</h1>
           <input
             type="password"
             value={password}
@@ -325,9 +329,14 @@ export default function Admin() {
   return (
     <div className="min-h-screen bg-gray-100 pb-10">
       <header className="bg-iasa-blue text-white px-4 py-4 flex items-center justify-between">
-        <div>
-          <p className="font-bold">Panel de administracion</p>
-          <p className="text-xs text-white/80">IASA SA · Planta Don Felipe</p>
+        <div className="flex items-center gap-2.5">
+          <div className="bg-white rounded-lg px-2 py-1 shrink-0">
+            <Logo className="h-6" fallbackClassName="text-iasa-blue font-bold text-xs" />
+          </div>
+          <div>
+            <p className="font-bold">Panel de administracion</p>
+            <p className="text-xs text-white/80">Planta Don Felipe</p>
+          </div>
         </div>
         <div className="flex gap-2">
           <Link to="/" className="text-xs bg-white/15 rounded-full px-3 py-1.5">

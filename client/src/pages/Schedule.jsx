@@ -7,6 +7,7 @@ import StatTile from "../components/StatTile.jsx";
 import ProgressBar from "../components/ProgressBar.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import CompanyIndicators from "../components/CompanyIndicators.jsx";
+import Logo from "../components/Logo.jsx";
 
 const STATUS_FILTERS = ["Todos", "Pendiente", "En progreso", "Completado", "Con problema"];
 
@@ -155,13 +156,18 @@ export default function Schedule({ technician, onChangeUser }) {
     <div className="min-h-screen pb-10">
       <header className="bg-iasa-blue text-white px-4 pt-6 pb-4 sticky top-0 z-10 shadow">
         <div className="flex items-center justify-between mb-3">
-          <div>
-            <p className="font-bold text-lg leading-tight">IASA SA · Don Felipe</p>
-            <p className="text-xs text-white/80">
-              {technician.name} · {technician.role}
-              {week ? ` · Semana ${week}` : ""}
-            </p>
-            {loadedAt && <p className="text-[11px] text-white/60">{timeAgo(loadedAt)}</p>}
+          <div className="flex items-center gap-2.5">
+            <div className="bg-white rounded-lg px-2 py-1 shrink-0">
+              <Logo className="h-7" fallbackClassName="text-iasa-blue font-bold text-sm" />
+            </div>
+            <div>
+              <p className="font-bold text-lg leading-tight">Don Felipe</p>
+              <p className="text-xs text-white/80">
+                {technician.name} · {technician.role}
+                {week ? ` · Semana ${week}` : ""}
+              </p>
+              {loadedAt && <p className="text-[11px] text-white/60">{timeAgo(loadedAt)}</p>}
+            </div>
           </div>
           <button onClick={onChangeUser} className="text-xs bg-white/15 rounded-full px-3 py-1.5">
             Cambiar
