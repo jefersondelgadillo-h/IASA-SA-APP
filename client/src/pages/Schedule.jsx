@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { api } from "../lib/api.js";
 import ActivityCard from "../components/ActivityCard.jsx";
 import UpdateStatusModal from "../components/UpdateStatusModal.jsx";
@@ -348,12 +347,6 @@ export default function Schedule({ technician, onChangeUser }) {
           </section>
         ))}
       </main>
-
-      <footer className="text-center mt-8">
-        <Link to="/admin" className="text-xs text-gray-400 underline">
-          Panel de administracion
-        </Link>
-      </footer>
 
       {selected && (
         <UpdateStatusModal

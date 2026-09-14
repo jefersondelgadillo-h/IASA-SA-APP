@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../lib/api.js";
 import { setTechnician } from "../lib/session.js";
 import Logo from "../components/Logo.jsx";
@@ -134,6 +135,10 @@ export default function Login({ onLogin }) {
         <button onClick={handleEnter} className="w-full bg-iasa-blue text-white font-semibold rounded-xl py-3">
           Entrar
         </button>
+
+        <Link to="/admin" className="block text-center text-xs text-gray-400 underline mt-4">
+          Panel de administracion
+        </Link>
       </div>
     </div>
   );
