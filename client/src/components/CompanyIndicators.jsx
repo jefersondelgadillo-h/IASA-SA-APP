@@ -1,4 +1,4 @@
-import IndicatorCard from "./IndicatorCard.jsx";
+import LineIndicatorCard from "./LineIndicatorCard.jsx";
 import SectionHeader from "./SectionHeader.jsx";
 
 export default function CompanyIndicators({ indicators }) {
@@ -8,27 +8,23 @@ export default function CompanyIndicators({ indicators }) {
     <section className="bg-white rounded-2xl shadow-sm p-4">
       <SectionHeader icon="📈" title="Indicadores de la semana" />
       <div className="flex flex-wrap gap-2">
-        <IndicatorCard
-          label="Programa semanal"
-          value={indicators.programa_semanal.value}
-          meta={indicators.programa_semanal.meta}
-          previousValue={indicators.programa_semanal.previous_value}
-        />
-        <IndicatorCard
+        <LineIndicatorCard
           label="Fallas de equipos"
-          value={indicators.fallas_equipos.value}
           meta={indicators.fallas_equipos.meta}
+          crownValue={indicators.fallas_equipos.crown}
+          tecnalValue={indicators.fallas_equipos.tecnal}
           lowerIsBetter
         />
-        <IndicatorCard
+        <LineIndicatorCard
           label="Cumpl. prog. anual"
-          value={indicators.cumplimiento_anual.value}
           meta={indicators.cumplimiento_anual.meta}
+          crownValue={indicators.cumplimiento_anual.crown}
+          tecnalValue={indicators.cumplimiento_anual.tecnal}
         />
       </div>
       {indicators.updated_at && (
         <p className="text-[11px] text-gray-400 mt-3">
-          Fallas de equipos y cumplimiento anual actualizados el {new Date(indicators.updated_at).toLocaleDateString()}
+          Actualizado el {new Date(indicators.updated_at).toLocaleDateString()}
         </p>
       )}
     </section>

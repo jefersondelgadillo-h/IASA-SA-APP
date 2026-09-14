@@ -12,6 +12,17 @@ const db = new Database(path.join(dataDir, "iasa.db"));
 db.pragma("journal_mode = WAL");
 db.pragma("foreign_keys = ON");
 
+// Migracion: si "week_indicators" existe con el esquema viejo (un solo valor
+// total por indicador) se recrea con el esquema nuevo (Crown/Tecnal por
+// separado). El dato manual anterior no se puede convertir automaticamente
+// a las dos lineas, asi que se pierde y hay que volver a cargarlo.
+{
+  const existingCols = db.prepare("PRAGMA table_info(week_indicators)").all().map((c) => c.name);
+  if (existingCols.length > 0 && !existingCols.includes("fallas_equipos_crown_pct")) {
+    db.exec("DROP TABLE week_indicators");
+  }
+}
+
 // "code" es el codigo de "Puesto" tal cual aparece en el Excel (ej. WPAQUI, DCRUZ).
 // name/role quedan null hasta que el supervisor los complete en el panel admin
 // (seccion Tecnicos): sin eso, ese tecnico no aparece en el login. "role" es
@@ -76,13 +87,16 @@ CREATE INDEX IF NOT EXISTS idx_history_activity ON activity_history(activity_id)
 
 -- Indicadores de gestion que no salen del Excel semanal (vienen de otro sistema,
 -- ej. SAP/avisos): el supervisor los carga a mano desde el panel admin, una
--- fila por semana (identificada por week_start), y quedan visibles para todos
--- en la pantalla principal de esa semana.
+-- fila por semana (identificada por week_start), separados por linea de
+-- produccion (Crown / Tecnal), y quedan visibles para todos en la pantalla
+-- principal de esa semana.
 CREATE TABLE IF NOT EXISTS week_indicators (
   week_start TEXT PRIMARY KEY REFERENCES weeks(week_start) ON DELETE CASCADE,
-  fallas_equipos_pct REAL,
+  fallas_equipos_crown_pct REAL,
+  fallas_equipos_tecnal_pct REAL,
   fallas_equipos_meta REAL NOT NULL DEFAULT 3,
-  cumplimiento_anual_pct REAL,
+  cumplimiento_anual_crown_pct REAL,
+  cumplimiento_anual_tecnal_pct REAL,
   cumplimiento_anual_meta REAL NOT NULL DEFAULT 90,
   updated_at TEXT,
   updated_by TEXT
