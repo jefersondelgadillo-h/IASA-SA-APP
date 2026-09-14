@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api.js";
 import { setTechnician } from "../lib/session.js";
+import Logo from "../components/Logo.jsx";
 
 const ROLE_ORDER = ["Mecanico", "Electrico"];
 
@@ -62,7 +63,9 @@ export default function Login({ onLogin }) {
   return (
     <div className="min-h-screen flex flex-col justify-center items-center bg-iasa-blue px-6 py-10">
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl p-6">
-        <h1 className="text-xl font-bold text-gray-900 text-center mb-1">IASA SA</h1>
+        <div className="flex justify-center mb-2">
+          <Logo className="h-14" fallbackClassName="text-xl font-bold text-gray-900" />
+        </div>
         <p className="text-center text-gray-500 text-sm mb-6">Programacion semanal · Planta Don Felipe</p>
 
         <p className="text-sm font-medium text-gray-700 mb-2">Soy</p>
