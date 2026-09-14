@@ -8,7 +8,12 @@ export default function CompanyIndicators({ indicators }) {
     <section className="bg-white rounded-2xl shadow-sm p-4">
       <SectionHeader icon="📈" title="Indicadores de la semana" />
       <div className="flex flex-wrap gap-2">
-        <IndicatorCard label="Programa semanal" value={indicators.programa_semanal.value} meta={indicators.programa_semanal.meta} />
+        <IndicatorCard
+          label="Programa semanal"
+          value={indicators.programa_semanal.value}
+          meta={indicators.programa_semanal.meta}
+          previousValue={indicators.programa_semanal.previous_value}
+        />
         <IndicatorCard
           label="Fallas de equipos"
           value={indicators.fallas_equipos.value}

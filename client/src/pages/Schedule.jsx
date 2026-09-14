@@ -42,7 +42,10 @@ function timeAgo(date) {
 function mergeActivities(list) {
   const map = new Map();
   for (const a of list) {
-    const key = a.order_number ? `${a.order_number}::${a.assigned_codes}` : `single-${a.id}`;
+    // Se incluye "_week" (si viene marcado, ej. en pendientes de semanas
+    // anteriores) para no fusionar por error el mismo numero de orden si se
+    // repitiera en semanas distintas.
+    const key = a.order_number ? `${a._week || ""}::${a.order_number}::${a.assigned_codes}` : `single-${a.id}`;
     if (!map.has(key)) {
       map.set(key, {
         ...a,
@@ -72,8 +75,14 @@ function mergeActivities(list) {
   return [...map.values()].map((g) => ({ ...g, dates: [...new Set(g.dates)].sort() }));
 }
 
+// Cuantas semanas anteriores a la que se esta viendo se revisan en busca de
+// actividades pendientes (para no hacer de mas llamadas si hay muchas
+// semanas cargadas con el tiempo).
+const CARRY_OVER_WEEKS = 4;
+
 export default function Schedule({ technician, onChangeUser }) {
   const [week, setWeek] = useState(null);
+  const [weeks, setWeeks] = useState([]);
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -82,15 +91,17 @@ export default function Schedule({ technician, onChangeUser }) {
   const [selected, setSelected] = useState(null);
   const [loadedAt, setLoadedAt] = useState(null);
   const [indicators, setIndicators] = useState(null);
+  const [carryOver, setCarryOver] = useState([]);
+  const [carryOverLoading, setCarryOverLoading] = useState(false);
 
-  async function load() {
+  async function load(weekStart) {
     setLoading(true);
     setError("");
     try {
       // Se trae toda la semana sin filtrar por especialidad: la clasificacion
       // Mecanico/Electrico puede faltar para algunos codigos todavia, y no
       // queremos que eso oculte actividades por error.
-      const data = await api.getSchedule({});
+      const data = await api.getSchedule(weekStart ? { week: weekStart } : {});
       setWeek(data.week);
       setActivities(data.activities);
       setLoadedAt(new Date());
@@ -101,17 +112,65 @@ export default function Schedule({ technician, onChangeUser }) {
     }
   }
 
+  function handleWeekChange(weekStart) {
+    load(weekStart);
+    api.getIndicators(weekStart).then(setIndicators).catch(() => setIndicators(null));
+  }
+
   useEffect(() => {
     load();
     api.getIndicators().then(setIndicators).catch(() => setIndicators(null));
+    api.getWeeks().then(setWeeks).catch(() => setWeeks([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Actividades no completadas de hasta CARRY_OVER_WEEKS semanas antes de la
+  // que se esta viendo, para que el tecnico pueda terminarlas sin tener que
+  // cambiar de semana manualmente.
+  useEffect(() => {
+    if (!week || weeks.length === 0) {
+      setCarryOver([]);
+      return;
+    }
+    const priorWeeks = weeks
+      .map((w) => w.week_start)
+      .filter((w) => w < week)
+      .sort((a, b) => (a < b ? 1 : -1))
+      .slice(0, CARRY_OVER_WEEKS);
+
+    if (priorWeeks.length === 0) {
+      setCarryOver([]);
+      return;
+    }
+
+    let cancelled = false;
+    setCarryOverLoading(true);
+    Promise.all(
+      priorWeeks.map((w) =>
+        api
+          .getSchedule({ week: w })
+          .then((r) => (r.activities || []).map((a) => ({ ...a, _week: w })))
+          .catch(() => [])
+      )
+    )
+      .then((results) => {
+        if (cancelled) return;
+        const pending = results.flat().filter((a) => a.status !== "Completado");
+        setCarryOver(pending);
+      })
+      .finally(() => {
+        if (!cancelled) setCarryOverLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [week, weeks]);
 
   // Alcance actual (segun "solo mis actividades" y especialidad) sin aplicar
   // todavia el filtro de estado: sirve de base para el resumen de avance y
   // para la lista filtrada, asi ambos quedan siempre consistentes entre si.
-  const scoped = useMemo(() => {
-    return activities.filter((a) => {
+  function scopeFor(list) {
+    return list.filter((a) => {
       if (onlyMine) {
         return technician.codes?.some((c) => a.assigned_codes_list.includes(c));
       }
@@ -119,12 +178,20 @@ export default function Schedule({ technician, onChangeUser }) {
       // no tenga especialidad clasificada (para no perder actividades).
       return !a.activity_type || a.activity_type === technician.role;
     });
-  }, [activities, onlyMine, technician.codes, technician.role]);
+  }
+
+  const scoped = useMemo(() => scopeFor(activities), [activities, onlyMine, technician.codes, technician.role]);
 
   // Se fusiona antes de filtrar por estado: asi el filtro se aplica al estado
   // representativo de cada orden (no deja "sueltas" ocurrencias de la misma
   // orden en dias que no calzan con el filtro).
   const mergedScoped = useMemo(() => mergeActivities(scoped), [scoped]);
+
+  const mergedCarryOver = useMemo(
+    () => mergeActivities(scopeFor(carryOver)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [carryOver, onlyMine, technician.codes, technician.role]
+  );
 
   const counts = useMemo(() => {
     const c = { Pendiente: 0, "En progreso": 0, Completado: 0, "Con problema": 0 };
@@ -150,6 +217,12 @@ export default function Schedule({ technician, onChangeUser }) {
     const updates = await Promise.all(ids.map((id) => api.updateStatus(id, body)));
     const byId = new Map(updates.map((u) => [u.id, u]));
     setActivities((prev) => prev.map((a) => (byId.has(a.id) ? { ...a, ...byId.get(a.id) } : a)));
+    // Si era una actividad de una semana anterior y quedo Completado, sale
+    // de "pendientes de semanas anteriores"; si sigue sin completar, se
+    // actualiza su estado ahi mismo.
+    setCarryOver((prev) =>
+      prev.map((a) => (byId.has(a.id) ? { ...a, ...byId.get(a.id) } : a)).filter((a) => a.status !== "Completado")
+    );
   }
 
   return (
@@ -164,7 +237,6 @@ export default function Schedule({ technician, onChangeUser }) {
               <p className="font-bold text-lg leading-tight">Don Felipe</p>
               <p className="text-xs text-white/80">
                 {technician.name} · {technician.role}
-                {week ? ` · Semana ${week}` : ""}
               </p>
               {loadedAt && <p className="text-[11px] text-white/60">{timeAgo(loadedAt)}</p>}
             </div>
@@ -173,6 +245,23 @@ export default function Schedule({ technician, onChangeUser }) {
             Cambiar
           </button>
         </div>
+
+        {weeks.length > 1 && (
+          <label className="flex items-center gap-2 text-sm mb-2">
+            <span className="text-white/70 text-xs">Semana</span>
+            <select
+              value={week || ""}
+              onChange={(e) => handleWeekChange(e.target.value)}
+              className="bg-white/15 text-white text-xs rounded-full pl-2 pr-1 py-1.5 border-none focus:outline-none focus:ring-1 focus:ring-white/50"
+            >
+              {weeks.map((w) => (
+                <option key={w.week_start} value={w.week_start} className="text-gray-900">
+                  {w.week_start}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
 
         <label
           className={`flex items-center gap-2 text-sm mb-2 ${!technician.codes?.length ? "opacity-60" : ""}`}
@@ -223,6 +312,19 @@ export default function Schedule({ technician, onChangeUser }) {
               <StatTile label="En progreso" value={counts["En progreso"]} tone="amber" />
               <StatTile label="Completado" value={counts.Completado} tone="green" />
               <StatTile label="Con problema" value={counts["Con problema"]} tone={counts["Con problema"] > 0 ? "red" : "default"} />
+            </div>
+          </section>
+        )}
+
+        {!carryOverLoading && mergedCarryOver.length > 0 && (
+          <section>
+            <h2 className="text-sm font-bold text-amber-700 uppercase tracking-wide mb-2">
+              ⏳ Pendientes de semanas anteriores ({mergedCarryOver.length})
+            </h2>
+            <div className="space-y-3">
+              {mergedCarryOver.map((a) => (
+                <ActivityCard key={`carry-${a.id}`} activity={a} onClick={() => setSelected(a)} />
+              ))}
             </div>
           </section>
         )}
