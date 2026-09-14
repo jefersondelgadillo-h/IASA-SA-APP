@@ -4,7 +4,18 @@ import StatusBadge from "./StatusBadge.jsx";
 
 const STATUSES = ["Pendiente", "En progreso", "Completado", "Con problema"];
 
+const DAY_SHORT = ["Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab"];
+
+function shortDate(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(`${dateStr}T00:00:00`);
+  if (isNaN(d)) return dateStr;
+  return `${DAY_SHORT[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`;
+}
+
 export default function UpdateStatusModal({ activity, technicianName, onClose, onSaved }) {
+  const ids = activity.ids || [activity.id];
+  const spansMultipleDays = activity.dates && activity.dates.length > 1;
   const [status, setStatus] = useState(activity.status);
   const [comment, setComment] = useState(activity.status_comment || "");
   const [saving, setSaving] = useState(false);
@@ -22,7 +33,14 @@ export default function UpdateStatusModal({ activity, technicianName, onClose, o
     setLoadingHistory(true);
     setHistoryError("");
     try {
-      setHistory(await api.getHistory(activity.id));
+      const perDay = await Promise.all(
+        ids.map(async (id) => {
+          const rows = await api.getHistory(id);
+          return rows.map((r) => ({ ...r, _date: activity.datesById?.[id] }));
+        })
+      );
+      const combined = perDay.flat().sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1));
+      setHistory(combined);
     } catch (err) {
       setHistoryError(err.message);
     } finally {
@@ -38,7 +56,7 @@ export default function UpdateStatusModal({ activity, technicianName, onClose, o
     setSaving(true);
     setError("");
     try {
-      await onSaved(activity.id, { status, comment: comment.trim(), updated_by: technicianName });
+      await onSaved(ids, { status, comment: comment.trim(), updated_by: technicianName });
       onClose();
     } catch (err) {
       setError(err.message);
@@ -59,11 +77,17 @@ export default function UpdateStatusModal({ activity, technicianName, onClose, o
             &times;
           </button>
         </div>
-        <p className="text-sm text-gray-500 mb-4">
+        <p className="text-sm text-gray-500 mb-1">
           {[activity.area, activity.equipment].filter(Boolean).join(" · ") || "Sin area/equipo"}
         </p>
+        {spansMultipleDays && (
+          <p className="text-xs text-iasa-blue bg-iasa-blue/5 rounded-lg p-2 mb-3">
+            📅 Esta orden tiene horas en {activity.dates.length} dias ({activity.dates.map(shortDate).join(", ")}).
+            El estado que guardes aplica a todos a la vez.
+          </p>
+        )}
 
-        <p className="text-sm font-medium text-gray-700 mb-2">Estado</p>
+        <p className="text-sm font-medium text-gray-700 mb-2 mt-3">Estado</p>
         <div className="grid grid-cols-2 gap-2 mb-4">
           {STATUSES.map((s) => (
             <button
@@ -114,6 +138,9 @@ export default function UpdateStatusModal({ activity, technicianName, onClose, o
             {history.map((h) => (
               <div key={h.id} className="text-xs bg-gray-50 rounded-lg p-2">
                 <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                  {spansMultipleDays && h._date && (
+                    <span className="text-iasa-blue font-medium">{shortDate(h._date)} ·</span>
+                  )}
                   {h.old_status && <StatusBadge status={h.old_status} className="opacity-60" />}
                   {h.old_status && <span className="text-gray-400">→</span>}
                   <StatusBadge status={h.new_status} />

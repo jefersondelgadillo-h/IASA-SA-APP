@@ -7,9 +7,18 @@ const ACCENT_BY_STATUS = {
   "Con problema": "border-l-red-400",
 };
 
+const DAY_SHORT = ["Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab"];
+
+function shortDate(dateStr) {
+  const d = new Date(`${dateStr}T00:00:00`);
+  if (isNaN(d)) return dateStr;
+  return `${DAY_SHORT[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`;
+}
+
 export default function ActivityCard({ activity, onClick }) {
   const assignedLabel = (activity.resolved_names || []).join(", ") || activity.assigned_to || "Sin asignar";
   const hasProblem = activity.status === "Con problema";
+  const spansMultipleDays = activity.dates && activity.dates.length > 1;
 
   return (
     <button
@@ -30,6 +39,11 @@ export default function ActivityCard({ activity, onClick }) {
         {activity.planned_hours != null && <span>🕒 {activity.planned_hours}h</span>}
         {activity.order_number && <span>#{activity.order_number}</span>}
       </div>
+      {spansMultipleDays && (
+        <p className="text-xs text-iasa-blue mt-1.5">
+          📅 {activity.dates.length} dias: {activity.dates.map(shortDate).join(", ")}
+        </p>
+      )}
       {activity.status_comment && (
         <p className="text-xs text-gray-600 mt-2 bg-gray-50 rounded-lg p-2">💬 {activity.status_comment}</p>
       )}
