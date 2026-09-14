@@ -94,7 +94,7 @@ router.get("/admin/dashboard", adminAuth, (req, res) => {
     db.prepare("SELECT week_start FROM weeks ORDER BY week_start DESC LIMIT 1").get()?.week_start;
   if (!week) return res.json({ week: null, activities: [], stats: {} });
 
-  const weekRow = db.prepare("SELECT id FROM weeks WHERE week_start = ?").get(week);
+  const weekRow = db.prepare("SELECT id, uploaded_at FROM weeks WHERE week_start = ?").get(week);
   if (!weekRow) return res.json({ week, activities: [], stats: {} });
 
   const activities = db
@@ -121,7 +121,7 @@ router.get("/admin/dashboard", adminAuth, (req, res) => {
   }
   stats["Sin clasificar"] = withNames.filter((a) => !a.activity_type).length;
 
-  res.json({ week, activities: withNames, stats });
+  res.json({ week, uploaded_at: weekRow.uploaded_at, activities: withNames, stats });
 });
 
 // --- Gestion del roster de tecnicos (codigo de Puesto -> nombre + especialidad) ---

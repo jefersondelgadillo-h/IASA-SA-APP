@@ -3,6 +3,12 @@ import { Link } from "react-router-dom";
 import { api } from "../lib/api.js";
 import { getAdminPassword, setAdminPassword, clearAdminPassword } from "../lib/session.js";
 import StatusBadge from "../components/StatusBadge.jsx";
+import SectionHeader from "../components/SectionHeader.jsx";
+import StatTile from "../components/StatTile.jsx";
+import ProgressBar from "../components/ProgressBar.jsx";
+import EmptyState from "../components/EmptyState.jsx";
+
+const STATUS_TONES = { Pendiente: "gray", "En progreso": "amber", Completado: "green", "Con problema": "red" };
 
 function nextMonday() {
   const d = new Date();
@@ -206,7 +212,7 @@ export default function Admin() {
 
       <main className="px-4 mt-4 space-y-6">
         <section className="bg-white rounded-2xl shadow-sm p-4">
-          <h2 className="font-semibold mb-3">Cargar programacion semanal (Excel)</h2>
+          <SectionHeader icon="📂" title="Cargar programacion semanal (Excel)" />
           <form onSubmit={handleUpload} className="space-y-3">
             <div>
               <label className="block text-sm text-gray-600 mb-1">Inicio de semana (lunes)</label>
@@ -246,31 +252,56 @@ export default function Admin() {
         </section>
 
         <section className="bg-white rounded-2xl shadow-sm p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold">Tablero de la semana {dashboard?.week || ""}</h2>
-            <button onClick={loadDashboard} className="text-xs text-iasa-blue underline">
-              Actualizar
-            </button>
-          </div>
+          <SectionHeader
+            icon="📊"
+            title={`Tablero de la semana ${dashboard?.week || ""}`}
+            action={
+              <button onClick={loadDashboard} className="text-xs text-iasa-blue underline">
+                Actualizar
+              </button>
+            }
+          />
+          {dashboard?.uploaded_at && (
+            <p className="text-xs text-gray-400 mb-3">
+              Cargado el {new Date(dashboard.uploaded_at).toLocaleString()}
+            </p>
+          )}
 
           {dashError && <p className="text-sm text-red-600 mb-2">{dashError}</p>}
 
-          {dashboard && (
-            <div className="flex flex-wrap gap-2 mb-4">
-              {["Pendiente", "En progreso", "Completado", "Con problema"].map((s) => (
-                <span key={s} className="text-xs bg-gray-100 rounded-full px-3 py-1">
-                  {s}: <strong>{dashboard.stats[s] || 0}</strong>
-                </span>
-              ))}
-              <span className="text-xs bg-gray-100 rounded-full px-3 py-1">
-                Total: <strong>{dashboard.stats.total || 0}</strong>
-              </span>
+          {dashboard && dashboard.stats.total > 0 && (
+            <>
+              <div className="grid grid-cols-5 gap-2 mb-4">
+                <StatTile label="Total" value={dashboard.stats.total || 0} tone="blue" />
+                <StatTile label="Pendiente" value={dashboard.stats.Pendiente || 0} />
+                <StatTile label="En progreso" value={dashboard.stats["En progreso"] || 0} tone="amber" />
+                <StatTile label="Completado" value={dashboard.stats.Completado || 0} tone="green" />
+                <StatTile
+                  label="Con problema"
+                  value={dashboard.stats["Con problema"] || 0}
+                  tone={dashboard.stats["Con problema"] > 0 ? "red" : "default"}
+                />
+              </div>
+
+              <div className="space-y-2 mb-4">
+                {["Pendiente", "En progreso", "Completado", "Con problema"].map((s) => (
+                  <ProgressBar
+                    key={s}
+                    label={s}
+                    value={dashboard.stats[s] || 0}
+                    total={dashboard.stats.total}
+                    tone={STATUS_TONES[s]}
+                  />
+                ))}
+              </div>
+
               {dashboard.stats["Sin clasificar"] > 0 && (
-                <span className="text-xs bg-amber-100 text-amber-800 rounded-full px-3 py-1">
-                  Sin clasificar: <strong>{dashboard.stats["Sin clasificar"]}</strong>
-                </span>
+                <p className="text-xs text-amber-800 bg-amber-50 rounded-lg p-2 mb-4">
+                  ⚠️ {dashboard.stats["Sin clasificar"]} actividad(es) sin especialidad clasificada. Completa el rol
+                  del tecnico correspondiente en la seccion "Tecnicos" de abajo.
+                </p>
               )}
-            </div>
+            </>
           )}
 
           <div className="flex gap-2 overflow-x-auto pb-2 mb-2">
@@ -328,8 +359,12 @@ export default function Admin() {
                 ))}
                 {activities.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="py-6 text-center text-gray-400">
-                      No hay actividades para mostrar.
+                    <td colSpan={10} className="py-4">
+                      <EmptyState
+                        icon="📭"
+                        title="No hay actividades para mostrar"
+                        message="Sube el Excel de la semana o cambia el filtro de estado."
+                      />
                     </td>
                   </tr>
                 )}
@@ -339,14 +374,15 @@ export default function Admin() {
         </section>
 
         <section className="bg-white rounded-2xl shadow-sm p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold">
-              Tecnicos {incompleteCount > 0 && <span className="text-amber-600">({incompleteCount} por completar)</span>}
-            </h2>
-            <button onClick={loadTechnicians} className="text-xs text-iasa-blue underline">
-              Actualizar
-            </button>
-          </div>
+          <SectionHeader
+            icon="👷"
+            title={`Tecnicos${incompleteCount > 0 ? ` (${incompleteCount} por completar)` : ""}`}
+            action={
+              <button onClick={loadTechnicians} className="text-xs text-iasa-blue underline">
+                Actualizar
+              </button>
+            }
+          />
           <p className="text-xs text-gray-500 mb-3">
             El codigo viene del Excel (columna "Puesto"). Completa el nombre y el rol para que ese tecnico pueda
             iniciar sesion en la app. Solo "Mecanico" y "Electrico" clasifican la especialidad de sus actividades;
@@ -375,8 +411,12 @@ export default function Admin() {
                 ))}
                 {technicians.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="py-6 text-center text-gray-400">
-                      Todavia no hay tecnicos. Suben un Excel para detectarlos automaticamente.
+                    <td colSpan={4} className="py-4">
+                      <EmptyState
+                        icon="👷"
+                        title="Todavia no hay tecnicos"
+                        message="Sube un Excel para detectarlos automaticamente."
+                      />
                     </td>
                   </tr>
                 )}

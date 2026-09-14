@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { api } from "../lib/api.js";
 import StatusBadge from "./StatusBadge.jsx";
 
 const STATUSES = ["Pendiente", "En progreso", "Completado", "Con problema"];
@@ -8,6 +9,26 @@ export default function UpdateStatusModal({ activity, technicianName, onClose, o
   const [comment, setComment] = useState(activity.status_comment || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const [history, setHistory] = useState(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState("");
+
+  async function toggleHistory() {
+    if (history !== null) {
+      setHistory(null);
+      return;
+    }
+    setLoadingHistory(true);
+    setHistoryError("");
+    try {
+      setHistory(await api.getHistory(activity.id));
+    } catch (err) {
+      setHistoryError(err.message);
+    } finally {
+      setLoadingHistory(false);
+    }
+  }
 
   async function handleSave() {
     if (status === "Con problema" && !comment.trim()) {
@@ -77,6 +98,34 @@ export default function UpdateStatusModal({ activity, technicianName, onClose, o
         >
           {saving ? "Guardando..." : "Guardar actualizacion"}
         </button>
+
+        <button onClick={toggleHistory} className="w-full text-xs text-iasa-blue underline mt-4 mb-1">
+          {history !== null ? "Ocultar historial de cambios" : "Ver historial de cambios"}
+        </button>
+
+        {loadingHistory && <p className="text-xs text-gray-400 text-center">Cargando historial...</p>}
+        {historyError && <p className="text-xs text-red-600 text-center">{historyError}</p>}
+
+        {history !== null && !loadingHistory && (
+          <div className="mt-2 space-y-2 max-h-40 overflow-y-auto">
+            {history.length === 0 && (
+              <p className="text-xs text-gray-400 text-center py-2">Todavia no hay cambios registrados.</p>
+            )}
+            {history.map((h) => (
+              <div key={h.id} className="text-xs bg-gray-50 rounded-lg p-2">
+                <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                  {h.old_status && <StatusBadge status={h.old_status} className="opacity-60" />}
+                  {h.old_status && <span className="text-gray-400">→</span>}
+                  <StatusBadge status={h.new_status} />
+                </div>
+                <p className="text-gray-500">
+                  {h.updated_by || "?"} · {new Date(h.updated_at).toLocaleString()}
+                </p>
+                {h.comment && <p className="text-gray-600 mt-1">💬 {h.comment}</p>}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
