@@ -1,5 +1,6 @@
 import { Router } from "express";
 import multer from "multer";
+import XLSX from "xlsx";
 import db from "../db.js";
 import { adminAuth } from "../middleware/adminAuth.js";
 import { parseScheduleWorkbook } from "../services/excelImport.js";
@@ -131,6 +132,80 @@ router.get("/admin/technicians", adminAuth, (req, res) => {
     .prepare("SELECT id, code, name, role, active FROM technicians ORDER BY (name IS NULL) DESC, code")
     .all();
   res.json(technicians);
+});
+
+const EXPORT_HEADERS = [
+  "Semana",
+  "Fecha",
+  "Orden",
+  "Area",
+  "Equipo",
+  "Actividad",
+  "Tipo",
+  "Responsable",
+  "Estado anterior",
+  "Estado nuevo",
+  "Comentario",
+  "Actualizado por",
+  "Actualizado el",
+];
+
+// Exporta el historial completo de cambios de estado (todas las semanas
+// cargadas hasta ahora) para que el supervisor lo analice en Excel/CSV.
+// Protegido con la clave de admin: solo el supervisor puede descargarlo.
+router.get("/admin/export", adminAuth, (req, res) => {
+  const format = req.query.format === "csv" ? "csv" : "xlsx";
+
+  const rows = db
+    .prepare(
+      `SELECT w.week_start, a.activity_date, a.order_number, a.area, a.equipment, a.description,
+              a.activity_type, a.assigned_codes, h.old_status, h.new_status, h.comment, h.updated_by, h.updated_at
+       FROM activity_history h
+       JOIN activities a ON a.id = h.activity_id
+       JOIN weeks w ON w.id = a.week_id
+       ORDER BY h.updated_at DESC`
+    )
+    .all();
+
+  const nameByCode = new Map(db.prepare("SELECT code, name FROM technicians").all().map((t) => [t.code, t.name]));
+
+  const exportRows = rows.map((r) => ({
+    Semana: r.week_start,
+    Fecha: r.activity_date || "",
+    Orden: r.order_number || "",
+    Area: r.area || "",
+    Equipo: r.equipment || "",
+    Actividad: r.description,
+    Tipo: r.activity_type || "Sin clasificar",
+    Responsable: r.assigned_codes
+      .split(",")
+      .filter(Boolean)
+      .map((c) => nameByCode.get(c) || c)
+      .join(", "),
+    "Estado anterior": r.old_status || "",
+    "Estado nuevo": r.new_status,
+    Comentario: r.comment || "",
+    "Actualizado por": r.updated_by || "",
+    "Actualizado el": new Date(r.updated_at).toLocaleString(),
+  }));
+
+  const sheet =
+    exportRows.length > 0 ? XLSX.utils.json_to_sheet(exportRows) : XLSX.utils.aoa_to_sheet([EXPORT_HEADERS]);
+  const filenameBase = "historial_mantenimiento_iasa";
+
+  if (format === "csv") {
+    const csv = XLSX.utils.sheet_to_csv(sheet);
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filenameBase}.csv"`);
+    return res.send("﻿" + csv); // BOM para que Excel muestre bien las tildes
+  }
+
+  const book = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(book, sheet, "Historial");
+  const buffer = XLSX.write(book, { type: "buffer", bookType: "xlsx" });
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", `attachment; filename="${filenameBase}.xlsx"`);
+  res.send(buffer);
 });
 
 // Indicadores de gestion que no vienen del Excel (Fallas de Equipos, Cumplimiento
