@@ -73,7 +73,22 @@ CREATE TABLE IF NOT EXISTS activity_history (
 CREATE INDEX IF NOT EXISTS idx_activities_week ON activities(week_id);
 CREATE INDEX IF NOT EXISTS idx_activities_codes ON activities(assigned_codes);
 CREATE INDEX IF NOT EXISTS idx_history_activity ON activity_history(activity_id);
+
+-- Indicadores de gestion que no salen del Excel semanal (vienen de otro sistema,
+-- ej. SAP/avisos): el supervisor los actualiza a mano desde el panel admin y
+-- quedan visibles para todos en la pantalla principal. Una sola fila (id = 1).
+CREATE TABLE IF NOT EXISTS company_indicators (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  fallas_equipos_pct REAL,
+  fallas_equipos_meta REAL NOT NULL DEFAULT 3,
+  cumplimiento_anual_pct REAL,
+  cumplimiento_anual_meta REAL NOT NULL DEFAULT 90,
+  updated_at TEXT,
+  updated_by TEXT
+);
 `);
+
+db.prepare("INSERT OR IGNORE INTO company_indicators (id, fallas_equipos_meta, cumplimiento_anual_meta) VALUES (1, 3, 90)").run();
 
 seedTechnicians(db);
 

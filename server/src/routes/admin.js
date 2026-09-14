@@ -94,7 +94,7 @@ router.get("/admin/dashboard", adminAuth, (req, res) => {
     db.prepare("SELECT week_start FROM weeks ORDER BY week_start DESC LIMIT 1").get()?.week_start;
   if (!week) return res.json({ week: null, activities: [], stats: {} });
 
-  const weekRow = db.prepare("SELECT id FROM weeks WHERE week_start = ?").get(week);
+  const weekRow = db.prepare("SELECT id, uploaded_at FROM weeks WHERE week_start = ?").get(week);
   if (!weekRow) return res.json({ week, activities: [], stats: {} });
 
   const activities = db
@@ -121,7 +121,7 @@ router.get("/admin/dashboard", adminAuth, (req, res) => {
   }
   stats["Sin clasificar"] = withNames.filter((a) => !a.activity_type).length;
 
-  res.json({ week, activities: withNames, stats });
+  res.json({ week, uploaded_at: weekRow.uploaded_at, activities: withNames, stats });
 });
 
 // --- Gestion del roster de tecnicos (codigo de Puesto -> nombre + especialidad) ---
@@ -131,6 +131,31 @@ router.get("/admin/technicians", adminAuth, (req, res) => {
     .prepare("SELECT id, code, name, role, active FROM technicians ORDER BY (name IS NULL) DESC, code")
     .all();
   res.json(technicians);
+});
+
+// Indicadores de gestion que no vienen del Excel (Fallas de Equipos, Cumplimiento
+// al Programa de Mantenimiento Anual): el supervisor los carga a mano aqui,
+// tomandolos de su reporte de Power BI/SAP semanal.
+router.patch("/admin/indicators", adminAuth, (req, res) => {
+  const { fallas_equipos_pct, fallas_equipos_meta, cumplimiento_anual_pct, cumplimiento_anual_meta } =
+    req.body || {};
+  const now = new Date().toISOString();
+
+  db.prepare(
+    `UPDATE company_indicators
+     SET fallas_equipos_pct = ?, fallas_equipos_meta = ?, cumplimiento_anual_pct = ?, cumplimiento_anual_meta = ?,
+         updated_at = ?, updated_by = ?
+     WHERE id = 1`
+  ).run(
+    fallas_equipos_pct === "" || fallas_equipos_pct == null ? null : Number(fallas_equipos_pct),
+    fallas_equipos_meta == null || fallas_equipos_meta === "" ? 3 : Number(fallas_equipos_meta),
+    cumplimiento_anual_pct === "" || cumplimiento_anual_pct == null ? null : Number(cumplimiento_anual_pct),
+    cumplimiento_anual_meta == null || cumplimiento_anual_meta === "" ? 90 : Number(cumplimiento_anual_meta),
+    now,
+    "Supervisor"
+  );
+
+  res.json(db.prepare("SELECT * FROM company_indicators WHERE id = 1").get());
 });
 
 router.patch("/admin/technicians/:id", adminAuth, (req, res) => {

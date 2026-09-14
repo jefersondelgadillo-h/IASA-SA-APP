@@ -3,6 +3,13 @@ import { Link } from "react-router-dom";
 import { api } from "../lib/api.js";
 import { getAdminPassword, setAdminPassword, clearAdminPassword } from "../lib/session.js";
 import StatusBadge from "../components/StatusBadge.jsx";
+import SectionHeader from "../components/SectionHeader.jsx";
+import StatTile from "../components/StatTile.jsx";
+import ProgressBar from "../components/ProgressBar.jsx";
+import EmptyState from "../components/EmptyState.jsx";
+import CompanyIndicators from "../components/CompanyIndicators.jsx";
+
+const STATUS_TONES = { Pendiente: "gray", "En progreso": "amber", Completado: "green", "Con problema": "red" };
 
 function nextMonday() {
   const d = new Date();
@@ -68,6 +75,93 @@ function TechnicianRow({ technician, onSaved }) {
   );
 }
 
+function IndicatorsForm({ indicators, onSaved }) {
+  const [fallasPct, setFallasPct] = useState(indicators.fallas_equipos.value ?? "");
+  const [fallasMeta, setFallasMeta] = useState(indicators.fallas_equipos.meta ?? 3);
+  const [cumplPct, setCumplPct] = useState(indicators.cumplimiento_anual.value ?? "");
+  const [cumplMeta, setCumplMeta] = useState(indicators.cumplimiento_anual.meta ?? 90);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function handleSave() {
+    setSaving(true);
+    setErr("");
+    setSaved(false);
+    try {
+      await onSaved({
+        fallas_equipos_pct: fallasPct,
+        fallas_equipos_meta: fallasMeta,
+        cumplimiento_anual_pct: cumplPct,
+        cumplimiento_anual_meta: cumplMeta,
+      });
+      setSaved(true);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <div>
+        <label className="block text-xs text-gray-500 mb-1">% Fallas de equipos</label>
+        <div className="flex gap-1">
+          <input
+            type="number"
+            step="0.01"
+            value={fallasPct}
+            onChange={(e) => setFallasPct(e.target.value)}
+            placeholder="ej. 5.51"
+            className="w-full border border-gray-300 rounded-lg p-2 text-sm"
+          />
+          <input
+            type="number"
+            step="0.01"
+            value={fallasMeta}
+            onChange={(e) => setFallasMeta(e.target.value)}
+            title="Meta"
+            className="w-20 border border-gray-300 rounded-lg p-2 text-sm"
+          />
+        </div>
+      </div>
+      <div>
+        <label className="block text-xs text-gray-500 mb-1">% Cumplimiento programa anual</label>
+        <div className="flex gap-1">
+          <input
+            type="number"
+            step="0.01"
+            value={cumplPct}
+            onChange={(e) => setCumplPct(e.target.value)}
+            placeholder="ej. 89.49"
+            className="w-full border border-gray-300 rounded-lg p-2 text-sm"
+          />
+          <input
+            type="number"
+            step="0.01"
+            value={cumplMeta}
+            onChange={(e) => setCumplMeta(e.target.value)}
+            title="Meta"
+            className="w-20 border border-gray-300 rounded-lg p-2 text-sm"
+          />
+        </div>
+      </div>
+      <div className="col-span-2 flex items-center gap-3">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="text-xs bg-iasa-blue text-white rounded-full px-4 py-1.5 disabled:opacity-50"
+        >
+          {saving ? "Guardando..." : "Guardar indicadores"}
+        </button>
+        {saved && <span className="text-xs text-green-700">Guardado ✓</span>}
+        {err && <span className="text-xs text-red-600">{err}</span>}
+      </div>
+    </div>
+  );
+}
+
 export default function Admin() {
   const [password, setPassword] = useState(getAdminPassword() || "");
   const [authed, setAuthed] = useState(!!getAdminPassword());
@@ -86,6 +180,9 @@ export default function Admin() {
 
   const [technicians, setTechnicians] = useState([]);
   const [techError, setTechError] = useState("");
+
+  const [indicators, setIndicators] = useState(null);
+  const [indicatorsError, setIndicatorsError] = useState("");
 
   async function handleLogin() {
     setLoginError("");
@@ -124,10 +221,25 @@ export default function Admin() {
     }
   }
 
+  async function loadIndicators() {
+    setIndicatorsError("");
+    try {
+      setIndicators(await api.getIndicators());
+    } catch (err) {
+      setIndicatorsError(err.message);
+    }
+  }
+
+  async function handleSaveIndicators(body) {
+    await api.adminUpdateIndicators(getAdminPassword(), body);
+    await loadIndicators();
+  }
+
   useEffect(() => {
     if (authed) {
       loadDashboard();
       loadTechnicians();
+      loadIndicators();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authed]);
@@ -206,7 +318,7 @@ export default function Admin() {
 
       <main className="px-4 mt-4 space-y-6">
         <section className="bg-white rounded-2xl shadow-sm p-4">
-          <h2 className="font-semibold mb-3">Cargar programacion semanal (Excel)</h2>
+          <SectionHeader icon="📂" title="Cargar programacion semanal (Excel)" />
           <form onSubmit={handleUpload} className="space-y-3">
             <div>
               <label className="block text-sm text-gray-600 mb-1">Inicio de semana (lunes)</label>
@@ -245,32 +357,69 @@ export default function Admin() {
           </form>
         </section>
 
+        {indicators && <CompanyIndicators indicators={indicators} />}
+
         <section className="bg-white rounded-2xl shadow-sm p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold">Tablero de la semana {dashboard?.week || ""}</h2>
-            <button onClick={loadDashboard} className="text-xs text-iasa-blue underline">
-              Actualizar
-            </button>
-          </div>
+          <SectionHeader icon="✍️" title="Cargar indicadores (Fallas de equipos / Cumpl. anual)" />
+          <p className="text-xs text-gray-500 mb-3">
+            El "Programa semanal" se calcula solo con los datos de esta app. Estos dos vienen de otro sistema (ej.
+            SAP/avisos) — actualizalos aqui una vez por semana o mes tomando el dato de tu reporte.
+          </p>
+          {indicatorsError && <p className="text-sm text-red-600 mb-2">{indicatorsError}</p>}
+          {indicators && <IndicatorsForm indicators={indicators} onSaved={handleSaveIndicators} />}
+        </section>
+
+        <section className="bg-white rounded-2xl shadow-sm p-4">
+          <SectionHeader
+            icon="📊"
+            title={`Tablero de la semana ${dashboard?.week || ""}`}
+            action={
+              <button onClick={loadDashboard} className="text-xs text-iasa-blue underline">
+                Actualizar
+              </button>
+            }
+          />
+          {dashboard?.uploaded_at && (
+            <p className="text-xs text-gray-400 mb-3">
+              Cargado el {new Date(dashboard.uploaded_at).toLocaleString()}
+            </p>
+          )}
 
           {dashError && <p className="text-sm text-red-600 mb-2">{dashError}</p>}
 
-          {dashboard && (
-            <div className="flex flex-wrap gap-2 mb-4">
-              {["Pendiente", "En progreso", "Completado", "Con problema"].map((s) => (
-                <span key={s} className="text-xs bg-gray-100 rounded-full px-3 py-1">
-                  {s}: <strong>{dashboard.stats[s] || 0}</strong>
-                </span>
-              ))}
-              <span className="text-xs bg-gray-100 rounded-full px-3 py-1">
-                Total: <strong>{dashboard.stats.total || 0}</strong>
-              </span>
+          {dashboard && dashboard.stats.total > 0 && (
+            <>
+              <div className="grid grid-cols-5 gap-2 mb-4">
+                <StatTile label="Total" value={dashboard.stats.total || 0} tone="blue" />
+                <StatTile label="Pendiente" value={dashboard.stats.Pendiente || 0} />
+                <StatTile label="En progreso" value={dashboard.stats["En progreso"] || 0} tone="amber" />
+                <StatTile label="Completado" value={dashboard.stats.Completado || 0} tone="green" />
+                <StatTile
+                  label="Con problema"
+                  value={dashboard.stats["Con problema"] || 0}
+                  tone={dashboard.stats["Con problema"] > 0 ? "red" : "default"}
+                />
+              </div>
+
+              <div className="space-y-2 mb-4">
+                {["Pendiente", "En progreso", "Completado", "Con problema"].map((s) => (
+                  <ProgressBar
+                    key={s}
+                    label={s}
+                    value={dashboard.stats[s] || 0}
+                    total={dashboard.stats.total}
+                    tone={STATUS_TONES[s]}
+                  />
+                ))}
+              </div>
+
               {dashboard.stats["Sin clasificar"] > 0 && (
-                <span className="text-xs bg-amber-100 text-amber-800 rounded-full px-3 py-1">
-                  Sin clasificar: <strong>{dashboard.stats["Sin clasificar"]}</strong>
-                </span>
+                <p className="text-xs text-amber-800 bg-amber-50 rounded-lg p-2 mb-4">
+                  ⚠️ {dashboard.stats["Sin clasificar"]} actividad(es) sin especialidad clasificada. Completa el rol
+                  del tecnico correspondiente en la seccion "Tecnicos" de abajo.
+                </p>
               )}
-            </div>
+            </>
           )}
 
           <div className="flex gap-2 overflow-x-auto pb-2 mb-2">
@@ -328,8 +477,12 @@ export default function Admin() {
                 ))}
                 {activities.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="py-6 text-center text-gray-400">
-                      No hay actividades para mostrar.
+                    <td colSpan={10} className="py-4">
+                      <EmptyState
+                        icon="📭"
+                        title="No hay actividades para mostrar"
+                        message="Sube el Excel de la semana o cambia el filtro de estado."
+                      />
                     </td>
                   </tr>
                 )}
@@ -339,14 +492,15 @@ export default function Admin() {
         </section>
 
         <section className="bg-white rounded-2xl shadow-sm p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold">
-              Tecnicos {incompleteCount > 0 && <span className="text-amber-600">({incompleteCount} por completar)</span>}
-            </h2>
-            <button onClick={loadTechnicians} className="text-xs text-iasa-blue underline">
-              Actualizar
-            </button>
-          </div>
+          <SectionHeader
+            icon="👷"
+            title={`Tecnicos${incompleteCount > 0 ? ` (${incompleteCount} por completar)` : ""}`}
+            action={
+              <button onClick={loadTechnicians} className="text-xs text-iasa-blue underline">
+                Actualizar
+              </button>
+            }
+          />
           <p className="text-xs text-gray-500 mb-3">
             El codigo viene del Excel (columna "Puesto"). Completa el nombre y el rol para que ese tecnico pueda
             iniciar sesion en la app. Solo "Mecanico" y "Electrico" clasifican la especialidad de sus actividades;
@@ -375,8 +529,12 @@ export default function Admin() {
                 ))}
                 {technicians.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="py-6 text-center text-gray-400">
-                      Todavia no hay tecnicos. Suben un Excel para detectarlos automaticamente.
+                    <td colSpan={4} className="py-4">
+                      <EmptyState
+                        icon="👷"
+                        title="Todavia no hay tecnicos"
+                        message="Sube un Excel para detectarlos automaticamente."
+                      />
                     </td>
                   </tr>
                 )}
