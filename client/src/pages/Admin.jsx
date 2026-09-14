@@ -76,10 +76,66 @@ function TechnicianRow({ technician, onSaved }) {
   );
 }
 
+function IndicatorLineInputs({
+  title,
+  meta,
+  onMetaChange,
+  crown,
+  onCrownChange,
+  crownPlaceholder,
+  tecnal,
+  onTecnalChange,
+  tecnalPlaceholder,
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <label className="text-xs text-gray-500">{title}</label>
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] text-gray-400">Meta</span>
+          <input
+            type="number"
+            step="0.01"
+            value={meta}
+            onChange={(e) => onMetaChange(e.target.value)}
+            className="w-16 border border-gray-300 rounded-lg p-1 text-xs"
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="block text-[10px] text-gray-400 mb-0.5">Crown</label>
+          <input
+            type="number"
+            step="0.01"
+            value={crown}
+            onChange={(e) => onCrownChange(e.target.value)}
+            placeholder={crownPlaceholder}
+            className="w-full border border-gray-300 rounded-lg p-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-[10px] text-gray-400 mb-0.5">Tecnal</label>
+          <input
+            type="number"
+            step="0.01"
+            value={tecnal}
+            onChange={(e) => onTecnalChange(e.target.value)}
+            placeholder={tecnalPlaceholder}
+            className="w-full border border-gray-300 rounded-lg p-2 text-sm"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function IndicatorsForm({ week, indicators, onSaved }) {
-  const [fallasPct, setFallasPct] = useState(indicators.fallas_equipos.value ?? "");
+  const [fallasCrown, setFallasCrown] = useState(indicators.fallas_equipos.crown ?? "");
+  const [fallasTecnal, setFallasTecnal] = useState(indicators.fallas_equipos.tecnal ?? "");
   const [fallasMeta, setFallasMeta] = useState(indicators.fallas_equipos.meta ?? 3);
-  const [cumplPct, setCumplPct] = useState(indicators.cumplimiento_anual.value ?? "");
+  const [cumplCrown, setCumplCrown] = useState(indicators.cumplimiento_anual.crown ?? "");
+  const [cumplTecnal, setCumplTecnal] = useState(indicators.cumplimiento_anual.tecnal ?? "");
   const [cumplMeta, setCumplMeta] = useState(indicators.cumplimiento_anual.meta ?? 90);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -92,9 +148,11 @@ function IndicatorsForm({ week, indicators, onSaved }) {
     try {
       await onSaved({
         week,
-        fallas_equipos_pct: fallasPct,
+        fallas_equipos_crown_pct: fallasCrown,
+        fallas_equipos_tecnal_pct: fallasTecnal,
         fallas_equipos_meta: fallasMeta,
-        cumplimiento_anual_pct: cumplPct,
+        cumplimiento_anual_crown_pct: cumplCrown,
+        cumplimiento_anual_tecnal_pct: cumplTecnal,
         cumplimiento_anual_meta: cumplMeta,
       });
       setSaved(true);
@@ -106,50 +164,30 @@ function IndicatorsForm({ week, indicators, onSaved }) {
   }
 
   return (
-    <div className="grid grid-cols-2 gap-3">
-      <div>
-        <label className="block text-xs text-gray-500 mb-1">% Fallas de equipos</label>
-        <div className="flex gap-1">
-          <input
-            type="number"
-            step="0.01"
-            value={fallasPct}
-            onChange={(e) => setFallasPct(e.target.value)}
-            placeholder="ej. 5.51"
-            className="w-full border border-gray-300 rounded-lg p-2 text-sm"
-          />
-          <input
-            type="number"
-            step="0.01"
-            value={fallasMeta}
-            onChange={(e) => setFallasMeta(e.target.value)}
-            title="Meta"
-            className="w-20 border border-gray-300 rounded-lg p-2 text-sm"
-          />
-        </div>
-      </div>
-      <div>
-        <label className="block text-xs text-gray-500 mb-1">% Cumplimiento programa anual</label>
-        <div className="flex gap-1">
-          <input
-            type="number"
-            step="0.01"
-            value={cumplPct}
-            onChange={(e) => setCumplPct(e.target.value)}
-            placeholder="ej. 89.49"
-            className="w-full border border-gray-300 rounded-lg p-2 text-sm"
-          />
-          <input
-            type="number"
-            step="0.01"
-            value={cumplMeta}
-            onChange={(e) => setCumplMeta(e.target.value)}
-            title="Meta"
-            className="w-20 border border-gray-300 rounded-lg p-2 text-sm"
-          />
-        </div>
-      </div>
-      <div className="col-span-2 flex items-center gap-3">
+    <div className="space-y-4">
+      <IndicatorLineInputs
+        title="% Fallas de equipos"
+        meta={fallasMeta}
+        onMetaChange={setFallasMeta}
+        crown={fallasCrown}
+        onCrownChange={setFallasCrown}
+        crownPlaceholder="ej. 6.24"
+        tecnal={fallasTecnal}
+        onTecnalChange={setFallasTecnal}
+        tecnalPlaceholder="ej. 4.80"
+      />
+      <IndicatorLineInputs
+        title="% Cumplimiento programa anual"
+        meta={cumplMeta}
+        onMetaChange={setCumplMeta}
+        crown={cumplCrown}
+        onCrownChange={setCumplCrown}
+        crownPlaceholder="ej. 85.0"
+        tecnal={cumplTecnal}
+        onTecnalChange={setCumplTecnal}
+        tecnalPlaceholder="ej. 92.0"
+      />
+      <div className="flex items-center gap-3">
         <button
           onClick={handleSave}
           disabled={saving}
@@ -439,13 +477,14 @@ export default function Admin() {
         <section className="bg-white rounded-2xl shadow-sm p-4">
           <SectionHeader icon="✍️" title="Cargar indicadores (Fallas de equipos / Cumpl. anual)" />
           <p className="text-xs text-gray-500 mb-3">
-            El "Programa semanal" se calcula solo con los datos de esta app. Estos dos vienen de otro sistema (ej.
-            SAP/avisos) — se cargan por semana, tomando el dato de tu reporte. Usa el selector de semana del tablero
-            de abajo para elegir cual estas cargando/corrigiendo (ahora mismo:{" "}
-            <strong>{dashboardWeek || "sin semana"}</strong>).
+            Vienen de otro sistema (ej. SAP/avisos), separados por linea de produccion (Crown / Tecnal) — se cargan
+            por semana, tomando el dato de tu reporte. Usa el selector de semana del tablero de abajo para elegir
+            cual estas cargando/corrigiendo (ahora mismo: <strong>{dashboardWeek || "sin semana"}</strong>).
           </p>
           {indicatorsError && <p className="text-sm text-red-600 mb-2">{indicatorsError}</p>}
-          {indicators && dashboardWeek && (
+          {/* indicators.week === dashboardWeek evita montar el formulario con datos
+              de la semana anterior mientras la nueva todavia esta cargando */}
+          {indicators && dashboardWeek && indicators.week === dashboardWeek && (
             <IndicatorsForm key={dashboardWeek} week={dashboardWeek} indicators={indicators} onSaved={handleSaveIndicators} />
           )}
           {!dashboardWeek && <p className="text-xs text-gray-400">Sube una semana primero para poder cargar sus indicadores.</p>}
