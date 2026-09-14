@@ -76,7 +76,7 @@ function TechnicianRow({ technician, onSaved }) {
   );
 }
 
-function IndicatorsForm({ indicators, onSaved }) {
+function IndicatorsForm({ week, indicators, onSaved }) {
   const [fallasPct, setFallasPct] = useState(indicators.fallas_equipos.value ?? "");
   const [fallasMeta, setFallasMeta] = useState(indicators.fallas_equipos.meta ?? 3);
   const [cumplPct, setCumplPct] = useState(indicators.cumplimiento_anual.value ?? "");
@@ -91,6 +91,7 @@ function IndicatorsForm({ indicators, onSaved }) {
     setSaved(false);
     try {
       await onSaved({
+        week,
         fallas_equipos_pct: fallasPct,
         fallas_equipos_meta: fallasMeta,
         cumplimiento_anual_pct: cumplPct,
@@ -190,6 +191,10 @@ export default function Admin() {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
 
+  const [deletingWeek, setDeletingWeek] = useState(false);
+  const [confirmDeleteWeek, setConfirmDeleteWeek] = useState(false);
+  const [deleteWeekError, setDeleteWeekError] = useState("");
+
   async function handleLogin() {
     setLoginError("");
     try {
@@ -236,10 +241,10 @@ export default function Admin() {
     }
   }
 
-  async function loadIndicators() {
+  async function loadIndicators(week) {
     setIndicatorsError("");
     try {
-      setIndicators(await api.getIndicators());
+      setIndicators(await api.getIndicators(week));
     } catch (err) {
       setIndicatorsError(err.message);
     }
@@ -247,7 +252,33 @@ export default function Admin() {
 
   async function handleSaveIndicators(body) {
     await api.adminUpdateIndicators(getAdminPassword(), body);
-    await loadIndicators();
+    await loadIndicators(body.week);
+  }
+
+  // Cambia de semana en el tablero, sus indicadores manuales y el formulario
+  // de carga de indicadores a la vez, para que todo quede consistente.
+  function handleWeekChange(week) {
+    loadDashboard(week);
+    loadIndicators(week);
+  }
+
+  async function handleDeleteWeek() {
+    if (!dashboardWeek) return;
+    setDeletingWeek(true);
+    setDeleteWeekError("");
+    try {
+      await api.adminDeleteWeek(getAdminPassword(), dashboardWeek);
+      setConfirmDeleteWeek(false);
+      const remaining = weeksList.filter((w) => w.week_start !== dashboardWeek);
+      setWeeksList(remaining);
+      const nextWeek = remaining[0]?.week_start;
+      await loadDashboard(nextWeek);
+      await loadIndicators(nextWeek);
+    } catch (err) {
+      setDeleteWeekError(err.message);
+    } finally {
+      setDeletingWeek(false);
+    }
   }
 
   useEffect(() => {
@@ -273,6 +304,7 @@ export default function Admin() {
       setNewTechnicianCodes(res.new_technicians || []);
       setFile(null);
       loadDashboard(res.week_start);
+      loadIndicators(res.week_start);
       loadTechnicians();
       loadWeeksList();
     } catch (err) {
@@ -408,10 +440,15 @@ export default function Admin() {
           <SectionHeader icon="✍️" title="Cargar indicadores (Fallas de equipos / Cumpl. anual)" />
           <p className="text-xs text-gray-500 mb-3">
             El "Programa semanal" se calcula solo con los datos de esta app. Estos dos vienen de otro sistema (ej.
-            SAP/avisos) — actualizalos aqui una vez por semana o mes tomando el dato de tu reporte.
+            SAP/avisos) — se cargan por semana, tomando el dato de tu reporte. Usa el selector de semana del tablero
+            de abajo para elegir cual estas cargando/corrigiendo (ahora mismo:{" "}
+            <strong>{dashboardWeek || "sin semana"}</strong>).
           </p>
           {indicatorsError && <p className="text-sm text-red-600 mb-2">{indicatorsError}</p>}
-          {indicators && <IndicatorsForm indicators={indicators} onSaved={handleSaveIndicators} />}
+          {indicators && dashboardWeek && (
+            <IndicatorsForm key={dashboardWeek} week={dashboardWeek} indicators={indicators} onSaved={handleSaveIndicators} />
+          )}
+          {!dashboardWeek && <p className="text-xs text-gray-400">Sube una semana primero para poder cargar sus indicadores.</p>}
         </section>
 
         <section className="bg-white rounded-2xl shadow-sm p-4">
@@ -444,7 +481,7 @@ export default function Admin() {
             icon="📊"
             title="Tablero de mantenimiento"
             action={
-              <button onClick={() => loadDashboard(dashboardWeek)} className="text-xs text-iasa-blue underline">
+              <button onClick={() => handleWeekChange(dashboardWeek)} className="text-xs text-iasa-blue underline">
                 Actualizar
               </button>
             }
@@ -454,7 +491,7 @@ export default function Admin() {
               Semana
               <select
                 value={dashboard?.week || ""}
-                onChange={(e) => loadDashboard(e.target.value)}
+                onChange={(e) => handleWeekChange(e.target.value)}
                 className="border border-gray-300 rounded-lg px-2 py-1 text-xs"
               >
                 {weeksList.map((w) => (
@@ -472,6 +509,45 @@ export default function Admin() {
           )}
 
           {dashError && <p className="text-sm text-red-600 mb-2">{dashError}</p>}
+
+          {dashboardWeek && (
+            <div className="mb-4">
+              {!confirmDeleteWeek ? (
+                <button
+                  onClick={() => setConfirmDeleteWeek(true)}
+                  className="text-xs text-red-600 underline"
+                >
+                  🗑️ Eliminar la programacion de la semana {dashboardWeek}
+                </button>
+              ) : (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                  <p className="text-sm text-red-800 font-medium mb-1">
+                    ¿Eliminar por completo la semana {dashboardWeek}?
+                  </p>
+                  <p className="text-xs text-red-700 mb-2">
+                    Se borran todas sus actividades, el historial de cambios y sus indicadores. No se puede deshacer.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleDeleteWeek}
+                      disabled={deletingWeek}
+                      className="text-xs bg-red-600 text-white rounded-full px-3 py-1.5 disabled:opacity-50"
+                    >
+                      {deletingWeek ? "Eliminando..." : "Si, eliminar"}
+                    </button>
+                    <button
+                      onClick={() => setConfirmDeleteWeek(false)}
+                      disabled={deletingWeek}
+                      className="text-xs border border-gray-300 rounded-full px-3 py-1.5"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                  {deleteWeekError && <p className="text-xs text-red-600 mt-2">{deleteWeekError}</p>}
+                </div>
+              )}
+            </div>
+          )}
 
           {dashboard && dashboard.stats.total > 0 && (
             <>

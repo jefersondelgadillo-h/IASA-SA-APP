@@ -21,8 +21,8 @@ function programaSemanalFor(weekStart) {
 // Indicadores de gestion visibles para todos (tecnicos y supervisores) apenas
 // entran a la app. "Programa Semanal" se calcula solo con datos de esta app
 // (actividades completadas / total de la semana), y se compara contra la
-// semana anterior; los otros dos vienen de otro sistema y los carga el
-// supervisor a mano desde el panel admin (no tienen historial por semana).
+// semana anterior; los otros dos vienen de otro sistema y el supervisor los
+// carga a mano por semana desde el panel admin.
 router.get("/indicators", (req, res) => {
   const week = req.query.week || currentWeekStart();
   let programaSemanal = null;
@@ -40,7 +40,7 @@ router.get("/indicators", (req, res) => {
     }
   }
 
-  const row = db.prepare("SELECT * FROM company_indicators WHERE id = 1").get();
+  const row = week ? db.prepare("SELECT * FROM week_indicators WHERE week_start = ?").get(week) : null;
 
   res.json({
     week,

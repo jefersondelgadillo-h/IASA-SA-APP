@@ -57,6 +57,8 @@ export const api = {
       headers: { "x-admin-password": password },
       body: JSON.stringify(body),
     }),
+  adminDeleteWeek: (password, weekStart) =>
+    request(`/admin/weeks/${weekStart}`, { method: "DELETE", headers: { "x-admin-password": password } }),
   adminExportHistory: async (password, format = "xlsx") => {
     const res = await fetch(`${BASE}/admin/export?format=${format}`, {
       headers: { "x-admin-password": password },
