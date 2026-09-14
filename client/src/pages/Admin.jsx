@@ -184,6 +184,9 @@ export default function Admin() {
   const [indicators, setIndicators] = useState(null);
   const [indicatorsError, setIndicatorsError] = useState("");
 
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
+
   async function handleLogin() {
     setLoginError("");
     try {
@@ -262,6 +265,26 @@ export default function Admin() {
       setUploadErr(err.message);
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function handleExport(format) {
+    setExporting(true);
+    setExportError("");
+    try {
+      const { blob, filename } = await api.adminExportHistory(getAdminPassword(), format);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExportError(err.message);
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -367,6 +390,31 @@ export default function Admin() {
           </p>
           {indicatorsError && <p className="text-sm text-red-600 mb-2">{indicatorsError}</p>}
           {indicators && <IndicatorsForm indicators={indicators} onSaved={handleSaveIndicators} />}
+        </section>
+
+        <section className="bg-white rounded-2xl shadow-sm p-4">
+          <SectionHeader icon="📤" title="Exportar historial de cambios" />
+          <p className="text-xs text-gray-500 mb-3">
+            Descarga todos los cambios de estado registrados hasta ahora (todas las semanas cargadas), con fecha,
+            actividad, responsable, estado anterior/nuevo y comentario — listo para analizar en Excel.
+          </p>
+          <div className="flex flex-wrap gap-2 items-center">
+            <button
+              onClick={() => handleExport("xlsx")}
+              disabled={exporting}
+              className="text-sm bg-iasa-blue text-white font-semibold rounded-xl px-4 py-2 disabled:opacity-50"
+            >
+              {exporting ? "Generando..." : "Exportar a Excel"}
+            </button>
+            <button
+              onClick={() => handleExport("csv")}
+              disabled={exporting}
+              className="text-sm border border-iasa-blue text-iasa-blue font-semibold rounded-xl px-4 py-2 disabled:opacity-50"
+            >
+              {exporting ? "Generando..." : "Exportar a CSV"}
+            </button>
+          </div>
+          {exportError && <p className="text-sm text-red-600 mt-2">{exportError}</p>}
         </section>
 
         <section className="bg-white rounded-2xl shadow-sm p-4">

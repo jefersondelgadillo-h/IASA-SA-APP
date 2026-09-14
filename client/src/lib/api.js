@@ -57,4 +57,18 @@ export const api = {
       headers: { "x-admin-password": password },
       body: JSON.stringify(body),
     }),
+  adminExportHistory: async (password, format = "xlsx") => {
+    const res = await fetch(`${BASE}/admin/export?format=${format}`, {
+      headers: { "x-admin-password": password },
+    });
+    if (!res.ok) {
+      const isJson = res.headers.get("content-type")?.includes("application/json");
+      const data = isJson ? await res.json() : null;
+      throw new Error(data?.error || `Error ${res.status}`);
+    }
+    const blob = await res.blob();
+    const match = (res.headers.get("content-disposition") || "").match(/filename="?([^"]+)"?/);
+    const filename = match ? match[1] : `historial.${format}`;
+    return { blob, filename };
+  },
 };
