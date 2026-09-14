@@ -6,6 +6,7 @@ import UpdateStatusModal from "../components/UpdateStatusModal.jsx";
 import StatTile from "../components/StatTile.jsx";
 import ProgressBar from "../components/ProgressBar.jsx";
 import EmptyState from "../components/EmptyState.jsx";
+import CompanyIndicators from "../components/CompanyIndicators.jsx";
 
 const STATUS_FILTERS = ["Todos", "Pendiente", "En progreso", "Completado", "Con problema"];
 
@@ -37,6 +38,7 @@ export default function Schedule({ technician, onChangeUser }) {
   const [statusFilter, setStatusFilter] = useState("Todos");
   const [selected, setSelected] = useState(null);
   const [loadedAt, setLoadedAt] = useState(null);
+  const [indicators, setIndicators] = useState(null);
 
   async function load() {
     setLoading(true);
@@ -58,6 +60,7 @@ export default function Schedule({ technician, onChangeUser }) {
 
   useEffect(() => {
     load();
+    api.getIndicators().then(setIndicators).catch(() => setIndicators(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -146,6 +149,8 @@ export default function Schedule({ technician, onChangeUser }) {
       </header>
 
       <main className="px-4 mt-4 space-y-6">
+        <CompanyIndicators indicators={indicators} />
+
         {loading && (
           <div className="space-y-3 animate-pulse">
             {[0, 1, 2].map((i) => (

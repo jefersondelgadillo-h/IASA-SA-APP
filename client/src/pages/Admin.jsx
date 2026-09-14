@@ -7,6 +7,7 @@ import SectionHeader from "../components/SectionHeader.jsx";
 import StatTile from "../components/StatTile.jsx";
 import ProgressBar from "../components/ProgressBar.jsx";
 import EmptyState from "../components/EmptyState.jsx";
+import CompanyIndicators from "../components/CompanyIndicators.jsx";
 
 const STATUS_TONES = { Pendiente: "gray", "En progreso": "amber", Completado: "green", "Con problema": "red" };
 
@@ -74,6 +75,93 @@ function TechnicianRow({ technician, onSaved }) {
   );
 }
 
+function IndicatorsForm({ indicators, onSaved }) {
+  const [fallasPct, setFallasPct] = useState(indicators.fallas_equipos.value ?? "");
+  const [fallasMeta, setFallasMeta] = useState(indicators.fallas_equipos.meta ?? 3);
+  const [cumplPct, setCumplPct] = useState(indicators.cumplimiento_anual.value ?? "");
+  const [cumplMeta, setCumplMeta] = useState(indicators.cumplimiento_anual.meta ?? 90);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function handleSave() {
+    setSaving(true);
+    setErr("");
+    setSaved(false);
+    try {
+      await onSaved({
+        fallas_equipos_pct: fallasPct,
+        fallas_equipos_meta: fallasMeta,
+        cumplimiento_anual_pct: cumplPct,
+        cumplimiento_anual_meta: cumplMeta,
+      });
+      setSaved(true);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <div>
+        <label className="block text-xs text-gray-500 mb-1">% Fallas de equipos</label>
+        <div className="flex gap-1">
+          <input
+            type="number"
+            step="0.01"
+            value={fallasPct}
+            onChange={(e) => setFallasPct(e.target.value)}
+            placeholder="ej. 5.51"
+            className="w-full border border-gray-300 rounded-lg p-2 text-sm"
+          />
+          <input
+            type="number"
+            step="0.01"
+            value={fallasMeta}
+            onChange={(e) => setFallasMeta(e.target.value)}
+            title="Meta"
+            className="w-20 border border-gray-300 rounded-lg p-2 text-sm"
+          />
+        </div>
+      </div>
+      <div>
+        <label className="block text-xs text-gray-500 mb-1">% Cumplimiento programa anual</label>
+        <div className="flex gap-1">
+          <input
+            type="number"
+            step="0.01"
+            value={cumplPct}
+            onChange={(e) => setCumplPct(e.target.value)}
+            placeholder="ej. 89.49"
+            className="w-full border border-gray-300 rounded-lg p-2 text-sm"
+          />
+          <input
+            type="number"
+            step="0.01"
+            value={cumplMeta}
+            onChange={(e) => setCumplMeta(e.target.value)}
+            title="Meta"
+            className="w-20 border border-gray-300 rounded-lg p-2 text-sm"
+          />
+        </div>
+      </div>
+      <div className="col-span-2 flex items-center gap-3">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="text-xs bg-iasa-blue text-white rounded-full px-4 py-1.5 disabled:opacity-50"
+        >
+          {saving ? "Guardando..." : "Guardar indicadores"}
+        </button>
+        {saved && <span className="text-xs text-green-700">Guardado ✓</span>}
+        {err && <span className="text-xs text-red-600">{err}</span>}
+      </div>
+    </div>
+  );
+}
+
 export default function Admin() {
   const [password, setPassword] = useState(getAdminPassword() || "");
   const [authed, setAuthed] = useState(!!getAdminPassword());
@@ -92,6 +180,9 @@ export default function Admin() {
 
   const [technicians, setTechnicians] = useState([]);
   const [techError, setTechError] = useState("");
+
+  const [indicators, setIndicators] = useState(null);
+  const [indicatorsError, setIndicatorsError] = useState("");
 
   async function handleLogin() {
     setLoginError("");
@@ -130,10 +221,25 @@ export default function Admin() {
     }
   }
 
+  async function loadIndicators() {
+    setIndicatorsError("");
+    try {
+      setIndicators(await api.getIndicators());
+    } catch (err) {
+      setIndicatorsError(err.message);
+    }
+  }
+
+  async function handleSaveIndicators(body) {
+    await api.adminUpdateIndicators(getAdminPassword(), body);
+    await loadIndicators();
+  }
+
   useEffect(() => {
     if (authed) {
       loadDashboard();
       loadTechnicians();
+      loadIndicators();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authed]);
@@ -249,6 +355,18 @@ export default function Admin() {
               </p>
             )}
           </form>
+        </section>
+
+        {indicators && <CompanyIndicators indicators={indicators} />}
+
+        <section className="bg-white rounded-2xl shadow-sm p-4">
+          <SectionHeader icon="✍️" title="Cargar indicadores (Fallas de equipos / Cumpl. anual)" />
+          <p className="text-xs text-gray-500 mb-3">
+            El "Programa semanal" se calcula solo con los datos de esta app. Estos dos vienen de otro sistema (ej.
+            SAP/avisos) — actualizalos aqui una vez por semana o mes tomando el dato de tu reporte.
+          </p>
+          {indicatorsError && <p className="text-sm text-red-600 mb-2">{indicatorsError}</p>}
+          {indicators && <IndicatorsForm indicators={indicators} onSaved={handleSaveIndicators} />}
         </section>
 
         <section className="bg-white rounded-2xl shadow-sm p-4">

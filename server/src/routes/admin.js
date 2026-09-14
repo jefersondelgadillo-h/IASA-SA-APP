@@ -133,6 +133,31 @@ router.get("/admin/technicians", adminAuth, (req, res) => {
   res.json(technicians);
 });
 
+// Indicadores de gestion que no vienen del Excel (Fallas de Equipos, Cumplimiento
+// al Programa de Mantenimiento Anual): el supervisor los carga a mano aqui,
+// tomandolos de su reporte de Power BI/SAP semanal.
+router.patch("/admin/indicators", adminAuth, (req, res) => {
+  const { fallas_equipos_pct, fallas_equipos_meta, cumplimiento_anual_pct, cumplimiento_anual_meta } =
+    req.body || {};
+  const now = new Date().toISOString();
+
+  db.prepare(
+    `UPDATE company_indicators
+     SET fallas_equipos_pct = ?, fallas_equipos_meta = ?, cumplimiento_anual_pct = ?, cumplimiento_anual_meta = ?,
+         updated_at = ?, updated_by = ?
+     WHERE id = 1`
+  ).run(
+    fallas_equipos_pct === "" || fallas_equipos_pct == null ? null : Number(fallas_equipos_pct),
+    fallas_equipos_meta == null || fallas_equipos_meta === "" ? 3 : Number(fallas_equipos_meta),
+    cumplimiento_anual_pct === "" || cumplimiento_anual_pct == null ? null : Number(cumplimiento_anual_pct),
+    cumplimiento_anual_meta == null || cumplimiento_anual_meta === "" ? 90 : Number(cumplimiento_anual_meta),
+    now,
+    "Supervisor"
+  );
+
+  res.json(db.prepare("SELECT * FROM company_indicators WHERE id = 1").get());
+});
+
 router.patch("/admin/technicians/:id", adminAuth, (req, res) => {
   const { name, role } = req.body || {};
   const technician = db.prepare("SELECT * FROM technicians WHERE id = ?").get(req.params.id);
