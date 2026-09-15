@@ -3,6 +3,8 @@ import { Routes, Route } from "react-router-dom";
 import Login from "./pages/Login.jsx";
 import Schedule from "./pages/Schedule.jsx";
 import Admin from "./pages/Admin.jsx";
+import Laminadores from "./pages/Laminadores.jsx";
+import LaminadorDetail from "./pages/LaminadorDetail.jsx";
 import { getTechnician, clearTechnician } from "./lib/session.js";
 
 function TechnicianArea() {
@@ -27,6 +29,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/admin" element={<Admin />} />
+      <Route path="/laminadores" element={<Laminadores />} />
+      <Route path="/laminadores/:id" element={<LaminadorDetail />} />
       <Route path="/*" element={<TechnicianArea />} />
     </Routes>
   );

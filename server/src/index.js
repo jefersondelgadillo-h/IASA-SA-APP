@@ -8,6 +8,7 @@ import scheduleRoutes from "./routes/schedule.js";
 import activitiesRoutes from "./routes/activities.js";
 import adminRoutes from "./routes/admin.js";
 import indicatorsRoutes from "./routes/indicators.js";
+import laminadoresRoutes from "./routes/laminadores.js";
 import "./db.js"; // asegura que la base de datos y las tablas existan al arrancar
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -23,6 +24,7 @@ app.use("/api", scheduleRoutes);
 app.use("/api", activitiesRoutes);
 app.use("/api", adminRoutes);
 app.use("/api", indicatorsRoutes);
+app.use("/api", laminadoresRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err);

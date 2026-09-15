@@ -27,6 +27,10 @@ export const api = {
     request(`/activities/${id}/status`, { method: "PATCH", body: JSON.stringify(body) }),
   getHistory: (id) => request(`/activities/${id}/history`),
   getIndicators: (week) => request(`/indicators${week ? `?week=${week}` : ""}`),
+  getLaminadores: () => request("/laminadores"),
+  getLaminadorResets: (id) => request(`/laminadores/${id}/resets`),
+  addLaminadorReset: (id, body) =>
+    request(`/laminadores/${id}/resets`, { method: "POST", body: JSON.stringify(body) }),
 
   adminLogin: (password) =>
     request("/admin/login", { method: "POST", headers: { "x-admin-password": password } }),
