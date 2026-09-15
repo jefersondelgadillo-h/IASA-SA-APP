@@ -136,7 +136,10 @@ export default function Login({ onLogin }) {
           Entrar
         </button>
 
-        <Link to="/admin" className="block text-center text-xs text-gray-400 underline mt-4">
+        <Link to="/laminadores" className="block text-center text-xs text-iasa-blue underline mt-4">
+          ⚙️ Historial de Laminadores TECNAL
+        </Link>
+        <Link to="/admin" className="block text-center text-xs text-gray-400 underline mt-2">
           Panel de administracion
         </Link>
       </div>

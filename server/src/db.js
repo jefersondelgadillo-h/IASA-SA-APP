@@ -101,7 +101,32 @@ CREATE TABLE IF NOT EXISTS week_indicators (
   updated_at TEXT,
   updated_by TEXT
 );
+
+-- Los 8 laminadores TECNAL, cada uno con su propio historial independiente
+-- de reseteos de horometro. Seccion de acceso libre (sin clave), pensada
+-- para que cualquier operario registre y consulte el reseteo de su laminador.
+CREATE TABLE IF NOT EXISTS laminadores (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS laminador_resets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  laminador_id INTEGER NOT NULL REFERENCES laminadores(id) ON DELETE CASCADE,
+  reset_date TEXT NOT NULL,
+  hours_before REAL NOT NULL,
+  reason TEXT,
+  performed_by TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_laminador_resets_laminador ON laminador_resets(laminador_id);
 `);
+
+const insertLaminador = db.prepare("INSERT OR IGNORE INTO laminadores (id, name) VALUES (?, ?)");
+for (let i = 1; i <= 8; i++) {
+  insertLaminador.run(i, `Laminador ${i}`);
+}
 
 seedTechnicians(db);
 
