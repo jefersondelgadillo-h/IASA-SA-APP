@@ -1,18 +1,16 @@
-// Las 4 filas posibles del informe de medicion de rodillos (galga 0,05 mm):
-// rodillo fijo/movil, antes/despues de rectificar. El rodillo fijo (R1) usa
-// hora y el movil (R2) usa turno, igual que en el formato original.
-export const RODILLO_ROWS = [
-  { key: "R1AR", group: "Rodillo Fijo", estado: "Antes de rectificar", field: "hora" },
-  { key: "R1DR", group: "Rodillo Fijo", estado: "Despues de rectificar", field: "hora" },
-  { key: "R2AR", group: "Rodillo Movil", estado: "Antes de rectificar", field: "turno" },
-  { key: "R2DR", group: "Rodillo Movil", estado: "Despues de rectificar", field: "turno" },
+// Los 2 rodillos que se miden (fijo/movil). El rodillo fijo usa hora y el
+// movil usa turno, igual que en el formato original. Cada ciclo de
+// rectificacion queda en un mismo registro: se abre con "antes de
+// rectificar" y se completa despues con "despues de rectificar".
+export const RODILLOS = [
+  { key: "fijo", label: "Rodillo Fijo", field: "hora" },
+  { key: "movil", label: "Rodillo Movil", field: "turno" },
 ];
 
-export function rodilloRowInfo(rowKey) {
-  return RODILLO_ROWS.find((r) => r.key === rowKey);
+export function rodilloInfo(key) {
+  return RODILLOS.find((r) => r.key === key);
 }
 
-export function rodilloRowLabel(rowKey) {
-  const row = rodilloRowInfo(rowKey);
-  return row ? `${row.group} - ${row.estado}` : rowKey;
+export function rodilloLabel(key) {
+  return rodilloInfo(key)?.label || key;
 }

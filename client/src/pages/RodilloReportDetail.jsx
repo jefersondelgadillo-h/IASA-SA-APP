@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../lib/api.js";
 import Logo from "../components/Logo.jsx";
-import { rodilloRowInfo } from "../lib/rodillo.js";
+import { rodilloLabel } from "../lib/rodillo.js";
 import { getAdminPassword, setAdminPassword } from "../lib/session.js";
 
 const DAY_SHORT = ["Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab"];
@@ -23,6 +23,65 @@ const ADMIN_FIELDS = [
   { key: "comentario", label: "Comentario", type: "textarea" },
   { key: "revisado_por", label: "Revisado por", type: "text" },
 ];
+
+function PointsGrid({ prefix, report }) {
+  const points = Array.from({ length: 10 }, (_, i) => report[`${prefix}_point_${i + 1}`]);
+  return (
+    <div className="grid grid-cols-5 gap-2">
+      {points.map((value, i) => (
+        <div
+          key={i}
+          className={`rounded-xl py-3 text-center text-sm font-semibold ${
+            value === 1
+              ? "bg-green-100 text-green-800"
+              : value === 0
+              ? "bg-red-100 text-red-800"
+              : "bg-gray-100 text-gray-400"
+          }`}
+        >
+          <p className="text-[10px] uppercase tracking-wide opacity-70">P{i + 1}</p>
+          {value === 1 ? "0,05" : value === 0 ? "X" : "-"}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MedicionSection({ title, prefix, report }) {
+  const fecha = report[`${prefix}_fecha`];
+  if (!fecha) {
+    return (
+      <section className="bg-white rounded-2xl shadow-sm border-2 border-dashed border-gray-200 p-4">
+        <p className="text-sm font-medium text-gray-500">{title}</p>
+        <p className="text-xs text-amber-700 bg-amber-50 rounded-lg p-2 mt-2">
+          ⏳ Pendiente. El registro se completa cuando se registre esta medicion.
+        </p>
+      </section>
+    );
+  }
+
+  const points = Array.from({ length: 10 }, (_, i) => report[`${prefix}_point_${i + 1}`]);
+  const failCount = points.filter((p) => p === 0).length;
+
+  return (
+    <section className="bg-white rounded-2xl shadow-sm p-4">
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <p className="text-sm font-medium text-gray-700">{title}</p>
+        {failCount > 0 && (
+          <span className="text-xs bg-red-100 text-red-800 rounded-full px-2.5 py-1 whitespace-nowrap">
+            ⚠️ {failCount} no pasa
+          </span>
+        )}
+      </div>
+      <p className="text-sm text-gray-500 mb-1">
+        📅 {formatDate(fecha)} {report[`${prefix}_hora`] && `· 🕒 ${report[`${prefix}_hora`]}`}
+        {report[`${prefix}_turno`] && `· ${report[`${prefix}_turno`]}`}
+      </p>
+      <p className="text-sm text-gray-500 mb-3">👤 Ejecutado por: {report[`${prefix}_ejecutado_por`]}</p>
+      <PointsGrid prefix={prefix} report={report} />
+    </section>
+  );
+}
 
 export default function RodilloReportDetail() {
   const { id, reportId } = useParams();
@@ -51,9 +110,7 @@ export default function RodilloReportDetail() {
 
   useEffect(load, [id, reportId]);
 
-  const row = report ? rodilloRowInfo(report.row_key) : null;
-  const points = report ? Array.from({ length: 10 }, (_, i) => report[`point_${i + 1}`]) : [];
-  const failCount = points.filter((p) => p === 0).length;
+  const isComplete = report && report.despues_fecha;
 
   function startEditing() {
     setForm({
@@ -98,7 +155,7 @@ export default function RodilloReportDetail() {
         </div>
         <div>
           <p className="font-bold">{laminador?.name || "Laminador"}</p>
-          <p className="text-xs text-white/80">Medicion de rodillos {report ? formatDate(report.fecha) : ""}</p>
+          <p className="text-xs text-white/80">{report ? rodilloLabel(report.rodillo) : "Medicion de rodillos"}</p>
         </div>
       </header>
 
@@ -108,48 +165,16 @@ export default function RodilloReportDetail() {
 
         {!loading && !error && report && (
           <>
-            <section className="bg-white rounded-2xl shadow-sm p-4">
-              <div className="flex items-start justify-between gap-2 mb-1">
-                <div>
-                  <p className="font-semibold text-gray-900">{row?.group}</p>
-                  <p className="text-sm text-gray-500">{row?.estado}</p>
-                </div>
-                {failCount > 0 && (
-                  <span className="text-xs bg-red-100 text-red-800 rounded-full px-2.5 py-1 whitespace-nowrap">
-                    ⚠️ {failCount} no pasa
-                  </span>
-                )}
-              </div>
-              <p className="text-sm text-gray-500 mt-2">
-                📅 {formatDate(report.fecha)} {report.hora && `· 🕒 ${report.hora}`}
-                {report.turno && `· ${report.turno}`}
-              </p>
-              <p className="text-sm text-gray-500">👤 Ejecutado por: {report.ejecutado_por}</p>
-            </section>
+            <div
+              className={`rounded-2xl p-3 text-sm text-center font-medium ${
+                isComplete ? "bg-green-50 text-green-800 border border-green-200" : "bg-amber-50 text-amber-800 border border-amber-200"
+              }`}
+            >
+              {isComplete ? "✅ Registro completo (antes y despues de rectificar)" : "⏳ Pendiente de despues de rectificar"}
+            </div>
 
-            <section className="bg-white rounded-2xl shadow-sm p-4">
-              <p className="text-sm font-medium text-gray-700 mb-3">Lecturas de la galga [0,05 mm]</p>
-              <p className="text-xs text-gray-500 mb-3">
-                Punto 1: a 5 pulgadas del extremo izquierdo del rolo. Distancia entre puntos: 5 pulgadas.
-              </p>
-              <div className="grid grid-cols-5 gap-2">
-                {points.map((value, i) => (
-                  <div
-                    key={i}
-                    className={`rounded-xl py-3 text-center text-sm font-semibold ${
-                      value === 1
-                        ? "bg-green-100 text-green-800"
-                        : value === 0
-                        ? "bg-red-100 text-red-800"
-                        : "bg-gray-100 text-gray-400"
-                    }`}
-                  >
-                    <p className="text-[10px] uppercase tracking-wide opacity-70">P{i + 1}</p>
-                    {value === 1 ? "0,05" : value === 0 ? "X" : "-"}
-                  </div>
-                ))}
-              </div>
-            </section>
+            <MedicionSection title="Antes de rectificar" prefix="antes" report={report} />
+            <MedicionSection title="Despues de rectificar" prefix="despues" report={report} />
 
             <section className="bg-white rounded-2xl shadow-sm p-4">
               <div className="flex items-center justify-between mb-3">
@@ -199,14 +224,11 @@ export default function RodilloReportDetail() {
                     </div>
                   ))}
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Clave de administrador (la misma del panel de administracion)
-                    </label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Clave de administrador</label>
                     <input
                       type="password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Clave para subir la programacion semanal"
                       className="w-full border border-gray-300 rounded-xl p-2.5 text-sm"
                     />
                   </div>

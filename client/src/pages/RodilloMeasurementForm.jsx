@@ -2,10 +2,19 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../lib/api.js";
 import Logo from "../components/Logo.jsx";
-import { RODILLO_ROWS } from "../lib/rodillo.js";
+import { RODILLOS, rodilloInfo } from "../lib/rodillo.js";
+
+const DAY_SHORT = ["Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab"];
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(`${dateStr}T00:00:00`);
+  if (isNaN(d)) return dateStr;
+  return `${DAY_SHORT[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
 }
 
 const TURNOS = ["Manana", "Tarde", "Noche"];
@@ -15,10 +24,11 @@ export default function RodilloMeasurementForm() {
   const navigate = useNavigate();
 
   const [laminador, setLaminador] = useState(null);
+  const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [rowKey, setRowKey] = useState("");
+  const [rodillo, setRodillo] = useState("");
   const [fecha, setFecha] = useState(todayISO());
   const [hora, setHora] = useState("");
   const [turno, setTurno] = useState("");
@@ -28,14 +38,20 @@ export default function RodilloMeasurementForm() {
   const [saveError, setSaveError] = useState("");
 
   useEffect(() => {
-    api
-      .getLaminadores()
-      .then((laminadores) => setLaminador(laminadores.find((l) => String(l.id) === String(id)) || null))
+    Promise.all([api.getLaminadores(), api.getRodilloReports(id)])
+      .then(([laminadores, rodilloData]) => {
+        setLaminador(laminadores.find((l) => String(l.id) === String(id)) || null);
+        setReports(rodilloData.reports);
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [id]);
 
-  const selectedRow = RODILLO_ROWS.find((r) => r.key === rowKey);
+  const selectedRodillo = rodilloInfo(rodillo);
+  const openReport = rodillo
+    ? reports.find((r) => r.rodillo === rodillo && r.antes_fecha && !r.despues_fecha)
+    : null;
+  const estado = openReport ? "despues" : "antes";
   const answeredCount = points.filter((p) => p !== null).length;
 
   function setPoint(index, value) {
@@ -44,15 +60,15 @@ export default function RodilloMeasurementForm() {
 
   async function handleSubmit() {
     setSaveError("");
-    if (!rowKey) {
-      setSaveError("Elige que rodillo y estado se midio.");
+    if (!rodillo) {
+      setSaveError("Elige que rodillo se midio.");
       return;
     }
-    if (selectedRow.field === "hora" && !hora.trim()) {
+    if (selectedRodillo.field === "hora" && !hora.trim()) {
       setSaveError("Escribe la hora de la medicion.");
       return;
     }
-    if (selectedRow.field === "turno" && !turno) {
+    if (selectedRodillo.field === "turno" && !turno) {
       setSaveError("Elige el turno de la medicion.");
       return;
     }
@@ -67,10 +83,11 @@ export default function RodilloMeasurementForm() {
     setSaving(true);
     try {
       await api.addRodilloReport(id, {
-        row_key: rowKey,
+        rodillo,
+        estado,
         fecha,
-        hora: selectedRow.field === "hora" ? hora.trim() : "",
-        turno: selectedRow.field === "turno" ? turno : "",
+        hora: selectedRodillo.field === "hora" ? hora.trim() : "",
+        turno: selectedRodillo.field === "turno" ? turno : "",
         points,
         ejecutado_por: ejecutadoPor.trim(),
       });
@@ -91,7 +108,7 @@ export default function RodilloMeasurementForm() {
         <div>
           <p className="font-bold">{laminador?.name || "Laminador"}</p>
           <p className="text-xs text-white/80">
-            Medicion de rodillos (galga 0,05 mm) {rowKey && `· ${answeredCount}/10`}
+            Medicion de rodillos (galga 0,05 mm) {rodillo && `· ${answeredCount}/10`}
           </p>
         </div>
       </header>
@@ -103,25 +120,44 @@ export default function RodilloMeasurementForm() {
         {!loading && !error && (
           <>
             <section className="bg-white rounded-2xl shadow-sm p-4">
-              <p className="text-sm font-medium text-gray-700 mb-2">Que se midio</p>
+              <p className="text-sm font-medium text-gray-700 mb-2">Que rodillo se midio</p>
               <div className="grid grid-cols-2 gap-2 mb-1">
-                {RODILLO_ROWS.map((r) => (
+                {RODILLOS.map((r) => (
                   <button
                     key={r.key}
-                    onClick={() => setRowKey(r.key)}
-                    className={`rounded-xl border-2 py-2.5 px-2 text-xs font-medium text-left transition ${
-                      rowKey === r.key ? "border-iasa-blue bg-iasa-blue/5" : "border-gray-200 text-gray-500"
+                    onClick={() => setRodillo(r.key)}
+                    className={`rounded-xl border-2 py-2.5 px-2 text-sm font-semibold transition ${
+                      rodillo === r.key ? "border-iasa-blue bg-iasa-blue/5" : "border-gray-200 text-gray-500"
                     }`}
                   >
-                    <p className="font-semibold text-gray-900">{r.group}</p>
-                    <p>{r.estado}</p>
+                    {r.label}
                   </button>
                 ))}
               </div>
             </section>
 
-            {rowKey && (
+            {rodillo && (
               <>
+                <div
+                  className={`rounded-2xl p-3 text-sm ${
+                    openReport ? "bg-amber-50 text-amber-800 border border-amber-200" : "bg-blue-50 text-blue-800 border border-blue-200"
+                  }`}
+                >
+                  {openReport ? (
+                    <>
+                      ⏳ Hay una medicion <strong>antes de rectificar</strong> del{" "}
+                      <strong>{formatDate(openReport.antes_fecha)}</strong> pendiente para este rodillo. Vas a
+                      registrar <strong>despues de rectificar</strong> para completar ese mismo registro.
+                    </>
+                  ) : (
+                    <>
+                      Vas a registrar la medicion <strong>antes de rectificar</strong> para este rodillo. Cuando se
+                      rectifique, vuelve a esta pantalla para registrar "despues de rectificar" y completar el
+                      registro.
+                    </>
+                  )}
+                </div>
+
                 <section className="bg-white rounded-2xl shadow-sm p-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
                   <input
@@ -131,7 +167,7 @@ export default function RodilloMeasurementForm() {
                     className="w-full border border-gray-300 rounded-xl p-3 text-sm mb-3"
                   />
 
-                  {selectedRow.field === "hora" ? (
+                  {selectedRodillo.field === "hora" ? (
                     <>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Hora</label>
                       <input
@@ -208,7 +244,7 @@ export default function RodilloMeasurementForm() {
         )}
       </main>
 
-      {!loading && !error && rowKey && (
+      {!loading && !error && rodillo && (
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4">
           {saveError && <p className="text-sm text-red-600 mb-2 text-center">{saveError}</p>}
           <button
@@ -216,7 +252,7 @@ export default function RodilloMeasurementForm() {
             disabled={saving}
             className="w-full bg-iasa-blue text-white font-semibold rounded-xl py-3 disabled:opacity-60"
           >
-            {saving ? "Enviando..." : "Enviar medicion"}
+            {saving ? "Enviando..." : `Enviar medicion (${estado === "antes" ? "antes" : "despues"} de rectificar)`}
           </button>
         </div>
       )}
