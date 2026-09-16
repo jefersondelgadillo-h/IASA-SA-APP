@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../lib/api.js";
 import Logo from "../components/Logo.jsx";
 import EmptyState from "../components/EmptyState.jsx";
-import { rodilloRowLabel } from "../lib/rodillo.js";
+import { rodilloLabel } from "../lib/rodillo.js";
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -254,9 +254,10 @@ export default function LaminadorDetail() {
 
             <div className="space-y-3">
               {rodilloReports.map((r) => {
-                const failCount = Array.from({ length: 10 }, (_, i) => r[`point_${i + 1}`]).filter(
-                  (p) => p === 0
-                ).length;
+                const isComplete = !!r.despues_fecha;
+                const failCount = ["antes", "despues"]
+                  .flatMap((prefix) => Array.from({ length: 10 }, (_, i) => r[`${prefix}_point_${i + 1}`]))
+                  .filter((p) => p === 0).length;
                 return (
                   <Link
                     key={r.id}
@@ -265,16 +266,27 @@ export default function LaminadorDetail() {
                   >
                     <div className="flex items-start justify-between gap-2 mb-1">
                       <div>
-                        <p className="font-semibold text-gray-900">{r.fecha}</p>
-                        <p className="text-xs text-gray-500">{rodilloRowLabel(r.row_key)}</p>
+                        <p className="font-semibold text-gray-900">{rodilloLabel(r.rodillo)}</p>
+                        <p className="text-xs text-gray-500">
+                          {r.antes_fecha} {r.despues_fecha ? `→ ${r.despues_fecha}` : ""}
+                        </p>
                       </div>
-                      {failCount > 0 && (
-                        <span className="text-xs bg-red-100 text-red-800 rounded-full px-2 py-0.5 whitespace-nowrap">
-                          ⚠️ {failCount}
+                      <div className="flex flex-col items-end gap-1">
+                        <span
+                          className={`text-xs font-semibold rounded-full px-2 py-0.5 whitespace-nowrap ${
+                            isComplete ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"
+                          }`}
+                        >
+                          {isComplete ? "Completo" : "Pendiente despues"}
                         </span>
-                      )}
+                        {failCount > 0 && (
+                          <span className="text-xs bg-red-100 text-red-800 rounded-full px-2 py-0.5 whitespace-nowrap">
+                            ⚠️ {failCount}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-sm text-gray-500">👤 {r.ejecutado_por}</p>
+                    <p className="text-sm text-gray-500">👤 {r.antes_ejecutado_por}</p>
                   </Link>
                 );
               })}

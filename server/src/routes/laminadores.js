@@ -4,8 +4,9 @@ import { adminAuth } from "../middleware/adminAuth.js";
 
 const router = Router();
 
-const RODILLO_ROW_KEYS = ["R1AR", "R1DR", "R2AR", "R2DR"];
-const RODILLO_POINT_COLUMNS = Array.from({ length: 10 }, (_, i) => `point_${i + 1}`);
+const RODILLOS = ["fijo", "movil"];
+const ESTADOS = ["antes", "despues"];
+const rodilloPointColumns = (estado) => Array.from({ length: 10 }, (_, i) => `${estado}_point_${i + 1}`);
 const RODILLO_ADMIN_FIELDS = [
   "orden_programada",
   "ultimo_cambio_rolos",
@@ -178,16 +179,22 @@ router.post("/laminadores/:id/checklists", async (req, res) => {
 });
 
 // --- Informe de medicion de rodillos (galga 0,05 mm) ---
-// Cada envio de un operario es una fila del informe (rodillo fijo/movil,
-// antes/despues de rectificar). Mantenimiento completa despues los datos
-// de la orden/rectificacion y la conclusion de cada informe.
+// Un registro es un ciclo de rectificacion completo de un rodillo (fijo o
+// movil): se abre con la medicion "antes de rectificar" y se completa mas
+// adelante con "despues de rectificar" en el MISMO registro. Solo puede
+// haber un registro abierto (antes sin su despues) por rodillo a la vez,
+// para que nunca queden mediciones de "antes" sueltas. Mantenimiento
+// completa despues los datos de la orden/rectificacion y la conclusion.
 
 router.get("/laminadores/:id/rodillo-reports", async (req, res) => {
   const laminador = await db.prepare("SELECT id, name FROM laminadores WHERE id = ?").get(req.params.id);
   if (!laminador) return res.status(404).json({ error: "Laminador no encontrado." });
 
   const reports = await db
-    .prepare("SELECT * FROM rodillo_reports WHERE laminador_id = ? ORDER BY fecha DESC, id DESC")
+    .prepare(
+      `SELECT * FROM rodillo_reports WHERE laminador_id = ?
+       ORDER BY COALESCE(despues_fecha, antes_fecha) DESC, id DESC`
+    )
     .all(laminador.id);
 
   res.json({ laminador, reports });
@@ -201,16 +208,22 @@ router.get("/laminadores/:id/rodillo-reports/:reportId", async (req, res) => {
   res.json(report);
 });
 
-// Envio del operario: que fila del informe midio, fecha, hora/turno y las
-// 10 lecturas de la galga (1 = pasa, 0 = no pasa).
+// Envio del operario: rodillo (fijo/movil), estado (antes/despues), fecha,
+// hora/turno y las 10 lecturas de la galga (1 = pasa, 0 = no pasa).
+// "antes" abre un registro nuevo (falla si ya hay uno abierto para ese
+// rodillo); "despues" completa el registro abierto mas reciente de ese
+// rodillo (falla si no hay ninguno pendiente).
 router.post("/laminadores/:id/rodillo-reports", async (req, res) => {
   const laminador = await db.prepare("SELECT id, name FROM laminadores WHERE id = ?").get(req.params.id);
   if (!laminador) return res.status(404).json({ error: "Laminador no encontrado." });
 
-  const { row_key, fecha, hora, turno, points, ejecutado_por } = req.body || {};
+  const { rodillo, estado, fecha, hora, turno, points, ejecutado_por } = req.body || {};
 
-  if (!RODILLO_ROW_KEYS.includes(row_key)) {
-    return res.status(400).json({ error: "Indica que rodillo y estado se midio." });
+  if (!RODILLOS.includes(rodillo)) {
+    return res.status(400).json({ error: "Indica que rodillo se midio (fijo o movil)." });
+  }
+  if (!ESTADOS.includes(estado)) {
+    return res.status(400).json({ error: "Indica si la medicion es antes o despues de rectificar." });
   }
   if (!fecha || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
     return res.status(400).json({ error: "Indica la fecha de la medicion." });
@@ -222,24 +235,61 @@ router.post("/laminadores/:id/rodillo-reports", async (req, res) => {
     return res.status(400).json({ error: "Faltan las 10 lecturas de la galga (pasa/no pasa)." });
   }
 
-  const info = await db
-    .prepare(
-      `INSERT INTO rodillo_reports
-        (laminador_id, row_key, fecha, hora, turno, ${RODILLO_POINT_COLUMNS.join(", ")}, ejecutado_por)
-       VALUES (?, ?, ?, ?, ?, ${RODILLO_POINT_COLUMNS.map(() => "?").join(", ")}, ?)`
-    )
-    .run(
-      laminador.id,
-      row_key,
-      fecha,
-      hora && hora.trim() ? hora.trim() : null,
-      turno && turno.trim() ? turno.trim() : null,
-      ...points,
-      ejecutado_por.trim()
-    );
+  const pointColumns = rodilloPointColumns(estado);
+  const values = [
+    fecha,
+    hora && hora.trim() ? hora.trim() : null,
+    turno && turno.trim() ? turno.trim() : null,
+    ...points,
+    ejecutado_por.trim(),
+  ];
 
-  const created = await db.prepare("SELECT * FROM rodillo_reports WHERE id = ?").get(info.lastInsertRowid);
-  res.json(created);
+  const openReport = await db
+    .prepare(
+      `SELECT * FROM rodillo_reports
+       WHERE laminador_id = ? AND rodillo = ? AND antes_fecha IS NOT NULL AND despues_fecha IS NULL
+       ORDER BY id DESC LIMIT 1`
+    )
+    .get(laminador.id, rodillo);
+
+  if (estado === "antes") {
+    if (openReport) {
+      return res.status(409).json({
+        error:
+          "Ya existe una medicion 'antes de rectificar' pendiente de completar con 'despues de rectificar' para este rodillo. Completa esa antes de iniciar una nueva.",
+      });
+    }
+
+    const info = await db
+      .prepare(
+        `INSERT INTO rodillo_reports
+          (laminador_id, rodillo, antes_fecha, antes_hora, antes_turno, ${pointColumns.join(", ")}, antes_ejecutado_por)
+         VALUES (?, ?, ?, ?, ?, ${pointColumns.map(() => "?").join(", ")}, ?)`
+      )
+      .run(laminador.id, rodillo, ...values);
+
+    const created = await db.prepare("SELECT * FROM rodillo_reports WHERE id = ?").get(info.lastInsertRowid);
+    return res.json(created);
+  }
+
+  // estado === "despues"
+  if (!openReport) {
+    return res.status(400).json({
+      error: "Primero registra la medicion 'antes de rectificar' para este rodillo.",
+    });
+  }
+
+  await db
+    .prepare(
+      `UPDATE rodillo_reports
+       SET despues_fecha = ?, despues_hora = ?, despues_turno = ?, ${pointColumns.join(" = ?, ")} = ?,
+           despues_ejecutado_por = ?, updated_at = datetime('now')
+       WHERE id = ?`
+    )
+    .run(...values, openReport.id);
+
+  const updated = await db.prepare("SELECT * FROM rodillo_reports WHERE id = ?").get(openReport.id);
+  res.json(updated);
 });
 
 // Mantenimiento completa la orden/rectificacion, la conclusion y quien

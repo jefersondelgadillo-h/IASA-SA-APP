@@ -183,28 +183,45 @@ CREATE INDEX IF NOT EXISTS idx_checklist_reports_laminador ON checklist_reports(
 CREATE INDEX IF NOT EXISTS idx_checklist_report_items_report ON checklist_report_items(report_id);
 
 -- Informe de medicion de rodillos (galga 0,05 mm), formato "Informe de
--- medicion rodillos laminadores". Cada envio de un operario es UNA fila del
--- informe (un estado: rodillo fijo/movil, antes/despues de rectificar) con
--- sus 10 lecturas y la fecha/hora o turno. Mantenimiento completa despues
--- los datos de la orden/rectificacion, la conclusion y quien reviso.
+-- medicion rodillos laminadores". Un registro es un ciclo de rectificacion
+-- completo de un rodillo (fijo o movil): el operario abre el registro con
+-- la medicion "antes de rectificar", y mas adelante lo completa con
+-- "despues de rectificar" en ese MISMO registro (no se crean registros
+-- sueltos de "antes" sin su "despues"; solo puede haber uno abierto por
+-- rodillo a la vez). Mantenimiento completa despues los datos de la
+-- orden/rectificacion, la conclusion y quien reviso.
 CREATE TABLE IF NOT EXISTS rodillo_reports (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   laminador_id INTEGER NOT NULL REFERENCES laminadores(id) ON DELETE CASCADE,
-  row_key TEXT NOT NULL CHECK (row_key IN ('R1AR', 'R1DR', 'R2AR', 'R2DR')),
-  fecha TEXT NOT NULL,
-  hora TEXT,
-  turno TEXT,
-  point_1 INTEGER CHECK (point_1 IS NULL OR point_1 IN (0, 1)),
-  point_2 INTEGER CHECK (point_2 IS NULL OR point_2 IN (0, 1)),
-  point_3 INTEGER CHECK (point_3 IS NULL OR point_3 IN (0, 1)),
-  point_4 INTEGER CHECK (point_4 IS NULL OR point_4 IN (0, 1)),
-  point_5 INTEGER CHECK (point_5 IS NULL OR point_5 IN (0, 1)),
-  point_6 INTEGER CHECK (point_6 IS NULL OR point_6 IN (0, 1)),
-  point_7 INTEGER CHECK (point_7 IS NULL OR point_7 IN (0, 1)),
-  point_8 INTEGER CHECK (point_8 IS NULL OR point_8 IN (0, 1)),
-  point_9 INTEGER CHECK (point_9 IS NULL OR point_9 IN (0, 1)),
-  point_10 INTEGER CHECK (point_10 IS NULL OR point_10 IN (0, 1)),
-  ejecutado_por TEXT NOT NULL,
+  rodillo TEXT NOT NULL CHECK (rodillo IN ('fijo', 'movil')),
+  antes_fecha TEXT,
+  antes_hora TEXT,
+  antes_turno TEXT,
+  antes_point_1 INTEGER,
+  antes_point_2 INTEGER,
+  antes_point_3 INTEGER,
+  antes_point_4 INTEGER,
+  antes_point_5 INTEGER,
+  antes_point_6 INTEGER,
+  antes_point_7 INTEGER,
+  antes_point_8 INTEGER,
+  antes_point_9 INTEGER,
+  antes_point_10 INTEGER,
+  antes_ejecutado_por TEXT,
+  despues_fecha TEXT,
+  despues_hora TEXT,
+  despues_turno TEXT,
+  despues_point_1 INTEGER,
+  despues_point_2 INTEGER,
+  despues_point_3 INTEGER,
+  despues_point_4 INTEGER,
+  despues_point_5 INTEGER,
+  despues_point_6 INTEGER,
+  despues_point_7 INTEGER,
+  despues_point_8 INTEGER,
+  despues_point_9 INTEGER,
+  despues_point_10 INTEGER,
+  despues_ejecutado_por TEXT,
   orden_programada TEXT,
   ultimo_cambio_rolos TEXT,
   ultimo_rectificado TEXT,
@@ -233,6 +250,16 @@ async function init() {
   const existingCols = cols.rows.map((c) => c.name);
   if (existingCols.length > 0 && !existingCols.includes("fallas_equipos_crown_pct")) {
     await client.execute("DROP TABLE week_indicators");
+  }
+
+  // Migracion: "rodillo_reports" con el esquema viejo (una fila por
+  // estado antes/despues) se recrea con el esquema nuevo (antes y despues
+  // juntos en un mismo registro por rodillo). Las mediciones cargadas con
+  // el esquema anterior se pierden.
+  const rodilloCols = await client.execute("PRAGMA table_info(rodillo_reports)");
+  const existingRodilloCols = rodilloCols.rows.map((c) => c.name);
+  if (existingRodilloCols.length > 0 && !existingRodilloCols.includes("rodillo")) {
+    await client.execute("DROP TABLE rodillo_reports");
   }
 
   await client.executeMultiple(SCHEMA);
