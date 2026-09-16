@@ -105,8 +105,11 @@ function ResetForm({ laminadorId, onSaved, onCancel }) {
 
 export default function LaminadorDetail() {
   const { id } = useParams();
+  const [tab, setTab] = useState("checklist");
+
   const [laminador, setLaminador] = useState(null);
   const [resets, setResets] = useState([]);
+  const [checklists, setChecklists] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -115,9 +118,13 @@ export default function LaminadorDetail() {
     setLoading(true);
     setError("");
     try {
-      const data = await api.getLaminadorResets(id);
-      setLaminador(data.laminador);
-      setResets(data.resets);
+      const [resetsData, checklistsData] = await Promise.all([
+        api.getLaminadorResets(id),
+        api.getLaminadorChecklists(id),
+      ]);
+      setLaminador(resetsData.laminador);
+      setResets(resetsData.resets);
+      setChecklists(checklistsData.reports);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -138,51 +145,119 @@ export default function LaminadorDetail() {
 
   return (
     <div className="min-h-screen bg-gray-100 pb-10">
-      <header className="bg-iasa-blue text-white px-4 py-4 flex items-center gap-2.5">
-        <div className="bg-white rounded-lg px-2 py-1 shrink-0">
-          <Logo className="h-6" fallbackClassName="text-iasa-blue font-bold text-xs" />
+      <header className="bg-iasa-blue text-white px-4 py-4">
+        <div className="flex items-center gap-2.5 mb-3">
+          <div className="bg-white rounded-lg px-2 py-1 shrink-0">
+            <Logo className="h-6" fallbackClassName="text-iasa-blue font-bold text-xs" />
+          </div>
+          <div>
+            <p className="font-bold">{laminador?.name || "Laminador"}</p>
+            <p className="text-xs text-white/80">Checklist y horometro</p>
+          </div>
         </div>
-        <div>
-          <p className="font-bold">{laminador?.name || "Laminador"}</p>
-          <p className="text-xs text-white/80">Historial de reseteos de horometro</p>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setTab("checklist")}
+            className={`flex-1 text-xs font-medium rounded-full px-3 py-1.5 ${
+              tab === "checklist" ? "bg-white text-iasa-blue" : "bg-white/15 text-white"
+            }`}
+          >
+            📋 Checklist diario
+          </button>
+          <button
+            onClick={() => setTab("resets")}
+            className={`flex-1 text-xs font-medium rounded-full px-3 py-1.5 ${
+              tab === "resets" ? "bg-white text-iasa-blue" : "bg-white/15 text-white"
+            }`}
+          >
+            ⏱️ Reseteos horometro
+          </button>
         </div>
       </header>
 
       <main className="px-4 mt-4 space-y-4">
-        <button
-          onClick={() => setShowForm(true)}
-          className="w-full bg-iasa-blue text-white font-semibold rounded-xl py-3"
-        >
-          + Registrar reseteo
-        </button>
-
-        {loading && <p className="text-center text-gray-500 mt-10">Cargando historial...</p>}
+        {loading && <p className="text-center text-gray-500 mt-10">Cargando...</p>}
         {error && <p className="text-center text-red-600 mt-10">{error}</p>}
 
-        {!loading && !error && resets.length === 0 && (
-          <EmptyState
-            icon="⚙️"
-            title="Todavia no hay reseteos registrados"
-            message="Usa el boton de arriba para registrar el primero."
-          />
+        {!loading && !error && tab === "checklist" && (
+          <>
+            <Link
+              to={`/laminadores/${id}/checklist`}
+              className="block w-full text-center bg-iasa-blue text-white font-semibold rounded-xl py-3"
+            >
+              + Llenar checklist de hoy
+            </Link>
+
+            {checklists.length === 0 && (
+              <EmptyState
+                icon="📋"
+                title="Todavia no hay checklists registrados"
+                message="Usa el boton de arriba para llenar el primero."
+              />
+            )}
+
+            <div className="space-y-3">
+              {checklists.map((c) => (
+                <Link
+                  key={c.id}
+                  to={`/laminadores/${id}/checklist/${c.id}`}
+                  className="block bg-white rounded-2xl shadow-sm border border-gray-100 p-4 active:scale-[0.99] transition"
+                >
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <p className="font-semibold text-gray-900">{c.report_date}</p>
+                    <div className="flex gap-1.5">
+                      <span className="text-xs bg-green-100 text-green-800 rounded-full px-2 py-0.5">
+                        ✅ {c.ok_count}
+                      </span>
+                      {c.mal_count > 0 && (
+                        <span className="text-xs bg-red-100 text-red-800 rounded-full px-2 py-0.5">
+                          ⚠️ {c.mal_count}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-500">👤 {c.performed_by}</p>
+                </Link>
+              ))}
+            </div>
+          </>
         )}
 
-        <div className="space-y-3">
-          {resets.map((r) => (
-            <div key={r.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-              <div className="flex items-start justify-between gap-2 mb-1">
-                <p className="font-semibold text-gray-900">{r.reset_date}</p>
-                <span className="text-xs bg-gray-100 text-gray-700 rounded-full px-2.5 py-1 whitespace-nowrap">
-                  🕒 {r.hours_before} h
-                </span>
-              </div>
-              <p className="text-sm text-gray-500">👤 {r.performed_by}</p>
-              {r.reason && (
-                <p className="text-xs text-gray-600 mt-2 bg-gray-50 rounded-lg p-2">💬 {r.reason}</p>
-              )}
+        {!loading && !error && tab === "resets" && (
+          <>
+            <button
+              onClick={() => setShowForm(true)}
+              className="w-full bg-iasa-blue text-white font-semibold rounded-xl py-3"
+            >
+              + Registrar reseteo
+            </button>
+
+            {resets.length === 0 && (
+              <EmptyState
+                icon="⚙️"
+                title="Todavia no hay reseteos registrados"
+                message="Usa el boton de arriba para registrar el primero."
+              />
+            )}
+
+            <div className="space-y-3">
+              {resets.map((r) => (
+                <div key={r.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <p className="font-semibold text-gray-900">{r.reset_date}</p>
+                    <span className="text-xs bg-gray-100 text-gray-700 rounded-full px-2.5 py-1 whitespace-nowrap">
+                      🕒 {r.hours_before} h
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-500">👤 {r.performed_by}</p>
+                  {r.reason && (
+                    <p className="text-xs text-gray-600 mt-2 bg-gray-50 rounded-lg p-2">💬 {r.reason}</p>
+                  )}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </>
+        )}
 
         <div className="flex justify-center gap-4 pt-4">
           <Link to="/laminadores" className="text-xs text-gray-400 underline">

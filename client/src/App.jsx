@@ -5,6 +5,8 @@ import Schedule from "./pages/Schedule.jsx";
 import Admin from "./pages/Admin.jsx";
 import Laminadores from "./pages/Laminadores.jsx";
 import LaminadorDetail from "./pages/LaminadorDetail.jsx";
+import ChecklistForm from "./pages/ChecklistForm.jsx";
+import ChecklistDetail from "./pages/ChecklistDetail.jsx";
 import { getTechnician, clearTechnician } from "./lib/session.js";
 
 function TechnicianArea() {
@@ -31,6 +33,8 @@ export default function App() {
       <Route path="/admin" element={<Admin />} />
       <Route path="/laminadores" element={<Laminadores />} />
       <Route path="/laminadores/:id" element={<LaminadorDetail />} />
+      <Route path="/laminadores/:id/checklist" element={<ChecklistForm />} />
+      <Route path="/laminadores/:id/checklist/:reportId" element={<ChecklistDetail />} />
       <Route path="/*" element={<TechnicianArea />} />
     </Routes>
   );

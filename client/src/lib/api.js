@@ -31,6 +31,11 @@ export const api = {
   getLaminadorResets: (id) => request(`/laminadores/${id}/resets`),
   addLaminadorReset: (id, body) =>
     request(`/laminadores/${id}/resets`, { method: "POST", body: JSON.stringify(body) }),
+  getChecklistItems: () => request("/checklist-items"),
+  getLaminadorChecklists: (id) => request(`/laminadores/${id}/checklists`),
+  getLaminadorChecklistDetail: (id, reportId) => request(`/laminadores/${id}/checklists/${reportId}`),
+  addLaminadorChecklist: (id, body) =>
+    request(`/laminadores/${id}/checklists`, { method: "POST", body: JSON.stringify(body) }),
 
   adminLogin: (password) =>
     request("/admin/login", { method: "POST", headers: { "x-admin-password": password } }),
