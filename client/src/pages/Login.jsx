@@ -136,10 +136,20 @@ export default function Login({ onLogin }) {
           Entrar
         </button>
 
-        <Link to="/laminadores" className="block text-center text-xs text-iasa-blue underline mt-4">
+        <div className="flex items-center gap-3 my-5">
+          <div className="flex-1 h-px bg-gray-200" />
+          <span className="text-xs text-gray-400">o</span>
+          <div className="flex-1 h-px bg-gray-200" />
+        </div>
+
+        <Link
+          to="/laminadores"
+          className="w-full flex items-center justify-center gap-2 border-2 border-iasa-blue text-iasa-blue font-semibold rounded-xl py-3.5 active:scale-[0.99] transition"
+        >
           ⚙️ Historial de Laminadores TECNAL
         </Link>
-        <Link to="/admin" className="block text-center text-xs text-gray-400 underline mt-2">
+
+        <Link to="/admin" className="block text-center text-xs text-gray-400 underline mt-4">
           Panel de administracion
         </Link>
       </div>
