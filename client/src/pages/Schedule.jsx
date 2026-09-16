@@ -202,6 +202,12 @@ export default function Schedule({ technician, onChangeUser }) {
     return mergedScoped.filter((a) => statusFilter === "Todos" || a.status === statusFilter);
   }, [mergedScoped, statusFilter]);
 
+  // El filtro de estado tambien aplica a las pendientes de semanas
+  // anteriores: si no, quedaban visibles sin importar el filtro elegido.
+  const filteredCarryOver = useMemo(() => {
+    return mergedCarryOver.filter((a) => statusFilter === "Todos" || a.status === statusFilter);
+  }, [mergedCarryOver, statusFilter]);
+
   const grouped = useMemo(() => {
     const map = new Map();
     for (const a of merged) {
@@ -315,13 +321,13 @@ export default function Schedule({ technician, onChangeUser }) {
           </section>
         )}
 
-        {!carryOverLoading && mergedCarryOver.length > 0 && (
+        {!carryOverLoading && filteredCarryOver.length > 0 && (
           <section>
             <h2 className="text-sm font-bold text-amber-700 uppercase tracking-wide mb-2">
-              ⏳ Pendientes de semanas anteriores ({mergedCarryOver.length})
+              ⏳ Pendientes de semanas anteriores ({filteredCarryOver.length})
             </h2>
             <div className="space-y-3">
-              {mergedCarryOver.map((a) => (
+              {filteredCarryOver.map((a) => (
                 <ActivityCard key={`carry-${a.id}`} activity={a} onClick={() => setSelected(a)} />
               ))}
             </div>
