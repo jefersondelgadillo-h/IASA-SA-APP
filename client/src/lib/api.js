@@ -36,6 +36,16 @@ export const api = {
   getLaminadorChecklistDetail: (id, reportId) => request(`/laminadores/${id}/checklists/${reportId}`),
   addLaminadorChecklist: (id, body) =>
     request(`/laminadores/${id}/checklists`, { method: "POST", body: JSON.stringify(body) }),
+  getRodilloReports: (id) => request(`/laminadores/${id}/rodillo-reports`),
+  getRodilloReportDetail: (id, reportId) => request(`/laminadores/${id}/rodillo-reports/${reportId}`),
+  addRodilloReport: (id, body) =>
+    request(`/laminadores/${id}/rodillo-reports`, { method: "POST", body: JSON.stringify(body) }),
+  adminUpdateRodilloReport: (password, id, reportId, body) =>
+    request(`/laminadores/${id}/rodillo-reports/${reportId}`, {
+      method: "PATCH",
+      headers: { "x-admin-password": password },
+      body: JSON.stringify(body),
+    }),
 
   adminLogin: (password) =>
     request("/admin/login", { method: "POST", headers: { "x-admin-password": password } }),

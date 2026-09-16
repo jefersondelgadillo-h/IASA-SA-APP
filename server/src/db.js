@@ -181,6 +181,42 @@ CREATE TABLE IF NOT EXISTS checklist_report_items (
 
 CREATE INDEX IF NOT EXISTS idx_checklist_reports_laminador ON checklist_reports(laminador_id);
 CREATE INDEX IF NOT EXISTS idx_checklist_report_items_report ON checklist_report_items(report_id);
+
+-- Informe de medicion de rodillos (galga 0,05 mm), formato "Informe de
+-- medicion rodillos laminadores". Cada envio de un operario es UNA fila del
+-- informe (un estado: rodillo fijo/movil, antes/despues de rectificar) con
+-- sus 10 lecturas y la fecha/hora o turno. Mantenimiento completa despues
+-- los datos de la orden/rectificacion, la conclusion y quien reviso.
+CREATE TABLE IF NOT EXISTS rodillo_reports (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  laminador_id INTEGER NOT NULL REFERENCES laminadores(id) ON DELETE CASCADE,
+  row_key TEXT NOT NULL CHECK (row_key IN ('R1AR', 'R1DR', 'R2AR', 'R2DR')),
+  fecha TEXT NOT NULL,
+  hora TEXT,
+  turno TEXT,
+  point_1 INTEGER CHECK (point_1 IS NULL OR point_1 IN (0, 1)),
+  point_2 INTEGER CHECK (point_2 IS NULL OR point_2 IN (0, 1)),
+  point_3 INTEGER CHECK (point_3 IS NULL OR point_3 IN (0, 1)),
+  point_4 INTEGER CHECK (point_4 IS NULL OR point_4 IN (0, 1)),
+  point_5 INTEGER CHECK (point_5 IS NULL OR point_5 IN (0, 1)),
+  point_6 INTEGER CHECK (point_6 IS NULL OR point_6 IN (0, 1)),
+  point_7 INTEGER CHECK (point_7 IS NULL OR point_7 IN (0, 1)),
+  point_8 INTEGER CHECK (point_8 IS NULL OR point_8 IN (0, 1)),
+  point_9 INTEGER CHECK (point_9 IS NULL OR point_9 IN (0, 1)),
+  point_10 INTEGER CHECK (point_10 IS NULL OR point_10 IN (0, 1)),
+  ejecutado_por TEXT NOT NULL,
+  orden_programada TEXT,
+  ultimo_cambio_rolos TEXT,
+  ultimo_rectificado TEXT,
+  rectificador_usado TEXT,
+  conclusion TEXT,
+  comentario TEXT,
+  revisado_por TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_rodillo_reports_laminador ON rodillo_reports(laminador_id);
 `;
 
 // Crea las tablas si no existen, corre la migracion de indicadores si hace

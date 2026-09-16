@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../lib/api.js";
 import Logo from "../components/Logo.jsx";
 import EmptyState from "../components/EmptyState.jsx";
+import { rodilloRowLabel } from "../lib/rodillo.js";
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -110,6 +111,7 @@ export default function LaminadorDetail() {
   const [laminador, setLaminador] = useState(null);
   const [resets, setResets] = useState([]);
   const [checklists, setChecklists] = useState([]);
+  const [rodilloReports, setRodilloReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -118,13 +120,15 @@ export default function LaminadorDetail() {
     setLoading(true);
     setError("");
     try {
-      const [resetsData, checklistsData] = await Promise.all([
+      const [resetsData, checklistsData, rodilloData] = await Promise.all([
         api.getLaminadorResets(id),
         api.getLaminadorChecklists(id),
+        api.getRodilloReports(id),
       ]);
       setLaminador(resetsData.laminador);
       setResets(resetsData.resets);
       setChecklists(checklistsData.reports);
+      setRodilloReports(rodilloData.reports);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -155,18 +159,26 @@ export default function LaminadorDetail() {
             <p className="text-xs text-white/80">Checklist y horometro</p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
           <button
             onClick={() => setTab("checklist")}
-            className={`flex-1 text-xs font-medium rounded-full px-3 py-1.5 ${
+            className={`shrink-0 text-xs font-medium rounded-full px-3 py-1.5 whitespace-nowrap ${
               tab === "checklist" ? "bg-white text-iasa-blue" : "bg-white/15 text-white"
             }`}
           >
             📋 Checklist diario
           </button>
           <button
+            onClick={() => setTab("rodillos")}
+            className={`shrink-0 text-xs font-medium rounded-full px-3 py-1.5 whitespace-nowrap ${
+              tab === "rodillos" ? "bg-white text-iasa-blue" : "bg-white/15 text-white"
+            }`}
+          >
+            📏 Medicion rodillos
+          </button>
+          <button
             onClick={() => setTab("resets")}
-            className={`flex-1 text-xs font-medium rounded-full px-3 py-1.5 ${
+            className={`shrink-0 text-xs font-medium rounded-full px-3 py-1.5 whitespace-nowrap ${
               tab === "resets" ? "bg-white text-iasa-blue" : "bg-white/15 text-white"
             }`}
           >
@@ -219,6 +231,53 @@ export default function LaminadorDetail() {
                   <p className="text-sm text-gray-500">👤 {c.performed_by}</p>
                 </Link>
               ))}
+            </div>
+          </>
+        )}
+
+        {!loading && !error && tab === "rodillos" && (
+          <>
+            <Link
+              to={`/laminadores/${id}/rodillos/nuevo`}
+              className="block w-full text-center bg-iasa-blue text-white font-semibold rounded-xl py-3"
+            >
+              + Registrar medicion
+            </Link>
+
+            {rodilloReports.length === 0 && (
+              <EmptyState
+                icon="📏"
+                title="Todavia no hay mediciones registradas"
+                message="Usa el boton de arriba para registrar la primera."
+              />
+            )}
+
+            <div className="space-y-3">
+              {rodilloReports.map((r) => {
+                const failCount = Array.from({ length: 10 }, (_, i) => r[`point_${i + 1}`]).filter(
+                  (p) => p === 0
+                ).length;
+                return (
+                  <Link
+                    key={r.id}
+                    to={`/laminadores/${id}/rodillos/${r.id}`}
+                    className="block bg-white rounded-2xl shadow-sm border border-gray-100 p-4 active:scale-[0.99] transition"
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <div>
+                        <p className="font-semibold text-gray-900">{r.fecha}</p>
+                        <p className="text-xs text-gray-500">{rodilloRowLabel(r.row_key)}</p>
+                      </div>
+                      {failCount > 0 && (
+                        <span className="text-xs bg-red-100 text-red-800 rounded-full px-2 py-0.5 whitespace-nowrap">
+                          ⚠️ {failCount}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-500">👤 {r.ejecutado_por}</p>
+                  </Link>
+                );
+              })}
             </div>
           </>
         )}
