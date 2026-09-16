@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { seedTechnicians } from "./services/seedTechnicians.js";
+import { seedChecklistItems } from "./services/seedChecklistItems.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.join(__dirname, "..", "data");
@@ -150,6 +151,36 @@ CREATE TABLE IF NOT EXISTS laminador_resets (
 );
 
 CREATE INDEX IF NOT EXISTS idx_laminador_resets_laminador ON laminador_resets(laminador_id);
+
+-- Checklist diario de laminadores (mismo listado para los 8, ver
+-- server/config/checklist-items-seed.json). Los operadores de produccion
+-- llenan un reporte por dia/turno; mantenimiento lo revisa despues.
+CREATE TABLE IF NOT EXISTS checklist_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sub_sistema TEXT NOT NULL,
+  componente TEXT NOT NULL,
+  accion TEXT NOT NULL,
+  order_index INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS checklist_reports (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  laminador_id INTEGER NOT NULL REFERENCES laminadores(id) ON DELETE CASCADE,
+  report_date TEXT NOT NULL,
+  performed_by TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS checklist_report_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  report_id INTEGER NOT NULL REFERENCES checklist_reports(id) ON DELETE CASCADE,
+  checklist_item_id INTEGER NOT NULL REFERENCES checklist_items(id),
+  estado TEXT CHECK (estado IS NULL OR estado IN ('OK', 'MAL')),
+  comentario TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_checklist_reports_laminador ON checklist_reports(laminador_id);
+CREATE INDEX IF NOT EXISTS idx_checklist_report_items_report ON checklist_report_items(report_id);
 `;
 
 // Crea las tablas si no existen, corre la migracion de indicadores si hace
@@ -178,6 +209,7 @@ async function init() {
   }
 
   await seedTechnicians(db);
+  await seedChecklistItems(db);
 }
 
 const db = { prepare, transaction: withTransaction };
