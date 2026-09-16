@@ -199,11 +199,14 @@ export default function RodilloReportDetail() {
                     </div>
                   ))}
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Clave de administrador</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Clave de administrador (la misma del panel de administracion)
+                    </label>
                     <input
                       type="password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Clave para subir la programacion semanal"
                       className="w-full border border-gray-300 rounded-xl p-2.5 text-sm"
                     />
                   </div>
