@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../lib/api.js";
 import Logo from "../components/Logo.jsx";
-import { RODILLOS, rodilloInfo } from "../lib/rodillo.js";
+import { RODILLOS } from "../lib/rodillo.js";
 
 const DAY_SHORT = ["Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab"];
 
@@ -17,8 +17,6 @@ function formatDate(dateStr) {
   return `${DAY_SHORT[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
 }
 
-const TURNOS = ["Manana", "Tarde", "Noche"];
-
 export default function RodilloMeasurementForm() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -31,7 +29,6 @@ export default function RodilloMeasurementForm() {
   const [rodillo, setRodillo] = useState("");
   const [fecha, setFecha] = useState(todayISO());
   const [hora, setHora] = useState("");
-  const [turno, setTurno] = useState("");
   const [points, setPoints] = useState(Array(10).fill(null));
   const [ejecutadoPor, setEjecutadoPor] = useState("");
   const [saving, setSaving] = useState(false);
@@ -47,7 +44,6 @@ export default function RodilloMeasurementForm() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const selectedRodillo = rodilloInfo(rodillo);
   const openReport = rodillo
     ? reports.find((r) => r.rodillo === rodillo && r.antes_fecha && !r.despues_fecha)
     : null;
@@ -64,12 +60,8 @@ export default function RodilloMeasurementForm() {
       setSaveError("Elige que rodillo se midio.");
       return;
     }
-    if (selectedRodillo.field === "hora" && !hora.trim()) {
+    if (!hora.trim()) {
       setSaveError("Escribe la hora de la medicion.");
-      return;
-    }
-    if (selectedRodillo.field === "turno" && !turno) {
-      setSaveError("Elige el turno de la medicion.");
       return;
     }
     if (!ejecutadoPor.trim()) {
@@ -86,8 +78,7 @@ export default function RodilloMeasurementForm() {
         rodillo,
         estado,
         fecha,
-        hora: selectedRodillo.field === "hora" ? hora.trim() : "",
-        turno: selectedRodillo.field === "turno" ? turno : "",
+        hora: hora.trim(),
         points,
         ejecutado_por: ejecutadoPor.trim(),
       });
@@ -167,34 +158,13 @@ export default function RodilloMeasurementForm() {
                     className="w-full border border-gray-300 rounded-xl p-3 text-sm mb-3"
                   />
 
-                  {selectedRodillo.field === "hora" ? (
-                    <>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Hora</label>
-                      <input
-                        type="time"
-                        value={hora}
-                        onChange={(e) => setHora(e.target.value)}
-                        className="w-full border border-gray-300 rounded-xl p-3 text-sm mb-3"
-                      />
-                    </>
-                  ) : (
-                    <>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Turno</label>
-                      <div className="flex gap-2 mb-3">
-                        {TURNOS.map((t) => (
-                          <button
-                            key={t}
-                            onClick={() => setTurno(t)}
-                            className={`flex-1 rounded-xl border-2 py-2 text-sm font-medium ${
-                              turno === t ? "border-iasa-blue bg-iasa-blue/5 text-iasa-blue" : "border-gray-200 text-gray-500"
-                            }`}
-                          >
-                            {t}
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Hora</label>
+                  <input
+                    type="time"
+                    value={hora}
+                    onChange={(e) => setHora(e.target.value)}
+                    className="w-full border border-gray-300 rounded-xl p-3 text-sm mb-3"
+                  />
 
                   <label className="block text-sm font-medium text-gray-700 mb-1">Responsable</label>
                   <input

@@ -196,7 +196,6 @@ CREATE TABLE IF NOT EXISTS rodillo_reports (
   rodillo TEXT NOT NULL CHECK (rodillo IN ('fijo', 'movil')),
   antes_fecha TEXT,
   antes_hora TEXT,
-  antes_turno TEXT,
   antes_point_1 INTEGER,
   antes_point_2 INTEGER,
   antes_point_3 INTEGER,
@@ -210,7 +209,6 @@ CREATE TABLE IF NOT EXISTS rodillo_reports (
   antes_ejecutado_por TEXT,
   despues_fecha TEXT,
   despues_hora TEXT,
-  despues_turno TEXT,
   despues_point_1 INTEGER,
   despues_point_2 INTEGER,
   despues_point_3 INTEGER,
@@ -252,13 +250,17 @@ async function init() {
     await client.execute("DROP TABLE week_indicators");
   }
 
-  // Migracion: "rodillo_reports" con el esquema viejo (una fila por
-  // estado antes/despues) se recrea con el esquema nuevo (antes y despues
-  // juntos en un mismo registro por rodillo). Las mediciones cargadas con
-  // el esquema anterior se pierden.
+  // Migracion: "rodillo_reports" con un esquema viejo (una fila por estado
+  // antes/despues, o con turno para el rodillo movil) se recrea con el
+  // esquema nuevo (antes y despues juntos en un mismo registro, ambos
+  // rodillos por hora). Las mediciones cargadas con el esquema anterior se
+  // pierden.
   const rodilloCols = await client.execute("PRAGMA table_info(rodillo_reports)");
   const existingRodilloCols = rodilloCols.rows.map((c) => c.name);
-  if (existingRodilloCols.length > 0 && !existingRodilloCols.includes("rodillo")) {
+  if (
+    existingRodilloCols.length > 0 &&
+    (!existingRodilloCols.includes("rodillo") || existingRodilloCols.includes("antes_turno"))
+  ) {
     await client.execute("DROP TABLE rodillo_reports");
   }
 

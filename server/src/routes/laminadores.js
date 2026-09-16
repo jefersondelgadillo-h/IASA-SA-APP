@@ -209,15 +209,15 @@ router.get("/laminadores/:id/rodillo-reports/:reportId", async (req, res) => {
 });
 
 // Envio del operario: rodillo (fijo/movil), estado (antes/despues), fecha,
-// hora/turno y las 10 lecturas de la galga (1 = pasa, 0 = no pasa).
-// "antes" abre un registro nuevo (falla si ya hay uno abierto para ese
-// rodillo); "despues" completa el registro abierto mas reciente de ese
-// rodillo (falla si no hay ninguno pendiente).
+// hora y las 10 lecturas de la galga (1 = pasa, 0 = no pasa). "antes" abre
+// un registro nuevo (falla si ya hay uno abierto para ese rodillo);
+// "despues" completa el registro abierto mas reciente de ese rodillo
+// (falla si no hay ninguno pendiente).
 router.post("/laminadores/:id/rodillo-reports", async (req, res) => {
   const laminador = await db.prepare("SELECT id, name FROM laminadores WHERE id = ?").get(req.params.id);
   if (!laminador) return res.status(404).json({ error: "Laminador no encontrado." });
 
-  const { rodillo, estado, fecha, hora, turno, points, ejecutado_por } = req.body || {};
+  const { rodillo, estado, fecha, hora, points, ejecutado_por } = req.body || {};
 
   if (!RODILLOS.includes(rodillo)) {
     return res.status(400).json({ error: "Indica que rodillo se midio (fijo o movil)." });
@@ -236,13 +236,7 @@ router.post("/laminadores/:id/rodillo-reports", async (req, res) => {
   }
 
   const pointColumns = rodilloPointColumns(estado);
-  const values = [
-    fecha,
-    hora && hora.trim() ? hora.trim() : null,
-    turno && turno.trim() ? turno.trim() : null,
-    ...points,
-    ejecutado_por.trim(),
-  ];
+  const values = [fecha, hora && hora.trim() ? hora.trim() : null, ...points, ejecutado_por.trim()];
 
   const openReport = await db
     .prepare(
@@ -263,8 +257,8 @@ router.post("/laminadores/:id/rodillo-reports", async (req, res) => {
     const info = await db
       .prepare(
         `INSERT INTO rodillo_reports
-          (laminador_id, rodillo, antes_fecha, antes_hora, antes_turno, ${pointColumns.join(", ")}, antes_ejecutado_por)
-         VALUES (?, ?, ?, ?, ?, ${pointColumns.map(() => "?").join(", ")}, ?)`
+          (laminador_id, rodillo, antes_fecha, antes_hora, ${pointColumns.join(", ")}, antes_ejecutado_por)
+         VALUES (?, ?, ?, ?, ${pointColumns.map(() => "?").join(", ")}, ?)`
       )
       .run(laminador.id, rodillo, ...values);
 
@@ -282,7 +276,7 @@ router.post("/laminadores/:id/rodillo-reports", async (req, res) => {
   await db
     .prepare(
       `UPDATE rodillo_reports
-       SET despues_fecha = ?, despues_hora = ?, despues_turno = ?, ${pointColumns.join(" = ?, ")} = ?,
+       SET despues_fecha = ?, despues_hora = ?, ${pointColumns.join(" = ?, ")} = ?,
            despues_ejecutado_por = ?, updated_at = datetime('now')
        WHERE id = ?`
     )
