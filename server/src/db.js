@@ -1,4 +1,4 @@
-import Database from "better-sqlite3";
+import { createClient } from "@libsql/client";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,28 +8,70 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.join(__dirname, "..", "data");
 fs.mkdirSync(dataDir, { recursive: true });
 
-const db = new Database(path.join(dataDir, "iasa.db"));
-db.pragma("journal_mode = WAL");
-db.pragma("foreign_keys = ON");
+// Si TURSO_DATABASE_URL esta configurada, los datos se guardan en Turso (persisten
+// entre reinicios/redeploys, incluso en el plan gratis de Render que borra el disco
+// local). Sin eso configurado, sigue usando un archivo SQLite local como antes
+// (util para desarrollo). Ver docs/TURSO.md.
+const client = createClient({
+  url: process.env.TURSO_DATABASE_URL || `file:${path.join(dataDir, "iasa.db")}`,
+  authToken: process.env.TURSO_AUTH_TOKEN,
+  // Mantiene los enteros como Number normal (no BigInt), igual que
+  // better-sqlite3, para no romper comparaciones (===) en todo el codigo.
+  intMode: "number",
+});
 
-// Migracion: si "week_indicators" existe con el esquema viejo (un solo valor
-// total por indicador) se recrea con el esquema nuevo (Crown/Tecnal por
-// separado). El dato manual anterior no se puede convertir automaticamente
-// a las dos lineas, asi que se pierde y hay que volver a cargarlo.
-{
-  const existingCols = db.prepare("PRAGMA table_info(week_indicators)").all().map((c) => c.name);
-  if (existingCols.length > 0 && !existingCols.includes("fallas_equipos_crown_pct")) {
-    db.exec("DROP TABLE week_indicators");
+function normalizeArgs(params) {
+  if (params.length === 1 && params[0] && typeof params[0] === "object" && !Array.isArray(params[0])) {
+    return params[0];
+  }
+  return params;
+}
+
+// Envoltorio delgado con la misma forma que usaba better-sqlite3
+// (db.prepare(sql).get/.all/.run(...)) para no tener que reescribir cada
+// consulta del proyecto, solo agregar async/await donde se usan.
+// "executor" es el cliente o, dentro de una transaccion, el objeto tx.
+function boundPrepare(sql, executor) {
+  return {
+    async get(...params) {
+      const res = await executor.execute({ sql, args: normalizeArgs(params) });
+      return res.rows[0];
+    },
+    async all(...params) {
+      const res = await executor.execute({ sql, args: normalizeArgs(params) });
+      return res.rows;
+    },
+    async run(...params) {
+      const res = await executor.execute({ sql, args: normalizeArgs(params) });
+      return { lastInsertRowid: Number(res.lastInsertRowid ?? 0), changes: res.rowsAffected };
+    },
+  };
+}
+
+function prepare(sql) {
+  return boundPrepare(sql, client);
+}
+
+// Ejecuta una funcion que hace varias operaciones dentro de una transaccion
+// atomica. Reemplaza al patron "const tx = db.transaction(fn); tx();" de
+// better-sqlite3: aqui se usa como "await db.transaction(async (tx) => {...})",
+// y dentro se usa tx.prepare(...) (no db.prepare) para que las consultas
+// corran dentro de la misma transaccion.
+async function withTransaction(fn) {
+  const tx = await client.transaction("write");
+  const txDb = { prepare: (sql) => boundPrepare(sql, tx) };
+  try {
+    const result = await fn(txDb);
+    await tx.commit();
+    return result;
+  } finally {
+    // Si no se llego a commit() (error en el camino), close() hace el
+    // rollback automaticamente. Si ya se hizo commit, no hace nada.
+    tx.close();
   }
 }
 
-// "code" es el codigo de "Puesto" tal cual aparece en el Excel (ej. WPAQUI, DCRUZ).
-// name/role quedan null hasta que el supervisor los complete en el panel admin
-// (seccion Tecnicos): sin eso, ese tecnico no aparece en el login. "role" es
-// texto libre (Mecanico, Electrico, Supervisor, Mantenimiento...) porque no
-// todos los codigos del Excel son tecnicos de campo; solo 'Mecanico' y
-// 'Electrico' cuentan para clasificar la especialidad de una actividad.
-db.exec(`
+const SCHEMA = `
 CREATE TABLE IF NOT EXISTS technicians (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   code TEXT NOT NULL UNIQUE,
@@ -46,9 +88,6 @@ CREATE TABLE IF NOT EXISTS weeks (
   uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- Cada fila es una "ocurrencia" de una orden de trabajo en un dia especifico
--- de la semana (el Excel trae una orden por fila con horas planificadas por
--- dia; cada dia con horas > 0 se convierte en una fila aqui).
 CREATE TABLE IF NOT EXISTS activities (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   week_id INTEGER NOT NULL REFERENCES weeks(id) ON DELETE CASCADE,
@@ -57,8 +96,6 @@ CREATE TABLE IF NOT EXISTS activities (
   area TEXT,
   equipment TEXT,
   description TEXT NOT NULL,
-  -- Null cuando el/los codigo(s) asignados aun no tienen especialidad
-  -- registrada en "technicians", o cuando mezclan ambas especialidades.
   activity_type TEXT CHECK (activity_type IS NULL OR activity_type IN ('Mecanico', 'Electrico')),
   assigned_to TEXT,
   assigned_codes TEXT NOT NULL DEFAULT ',',
@@ -85,11 +122,6 @@ CREATE INDEX IF NOT EXISTS idx_activities_week ON activities(week_id);
 CREATE INDEX IF NOT EXISTS idx_activities_codes ON activities(assigned_codes);
 CREATE INDEX IF NOT EXISTS idx_history_activity ON activity_history(activity_id);
 
--- Indicadores de gestion que no salen del Excel semanal (vienen de otro sistema,
--- ej. SAP/avisos): el supervisor los carga a mano desde el panel admin, una
--- fila por semana (identificada por week_start), separados por linea de
--- produccion (Crown / Tecnal), y quedan visibles para todos en la pantalla
--- principal de esa semana.
 CREATE TABLE IF NOT EXISTS week_indicators (
   week_start TEXT PRIMARY KEY REFERENCES weeks(week_start) ON DELETE CASCADE,
   fallas_equipos_crown_pct REAL,
@@ -102,9 +134,6 @@ CREATE TABLE IF NOT EXISTS week_indicators (
   updated_by TEXT
 );
 
--- Los 8 laminadores TECNAL, cada uno con su propio historial independiente
--- de reseteos de horometro. Seccion de acceso libre (sin clave), pensada
--- para que cualquier operario registre y consulte el reseteo de su laminador.
 CREATE TABLE IF NOT EXISTS laminadores (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL UNIQUE
@@ -121,13 +150,37 @@ CREATE TABLE IF NOT EXISTS laminador_resets (
 );
 
 CREATE INDEX IF NOT EXISTS idx_laminador_resets_laminador ON laminador_resets(laminador_id);
-`);
+`;
 
-const insertLaminador = db.prepare("INSERT OR IGNORE INTO laminadores (id, name) VALUES (?, ?)");
-for (let i = 1; i <= 8; i++) {
-  insertLaminador.run(i, `Laminador ${i}`);
+// Crea las tablas si no existen, corre la migracion de indicadores si hace
+// falta, precarga los 8 laminadores y el roster inicial de tecnicos. Se debe
+// esperar (await db.ready) antes de arrancar el servidor.
+async function init() {
+  await client.execute("PRAGMA foreign_keys = ON");
+
+  // Migracion: si "week_indicators" existe con el esquema viejo (un solo
+  // valor total por indicador) se recrea con el esquema nuevo (Crown/Tecnal
+  // por separado). El dato manual anterior no se puede convertir
+  // automaticamente a las dos lineas, asi que se pierde.
+  const cols = await client.execute("PRAGMA table_info(week_indicators)");
+  const existingCols = cols.rows.map((c) => c.name);
+  if (existingCols.length > 0 && !existingCols.includes("fallas_equipos_crown_pct")) {
+    await client.execute("DROP TABLE week_indicators");
+  }
+
+  await client.executeMultiple(SCHEMA);
+
+  for (let i = 1; i <= 8; i++) {
+    await client.execute({
+      sql: "INSERT OR IGNORE INTO laminadores (id, name) VALUES (?, ?)",
+      args: [i, `Laminador ${i}`],
+    });
+  }
+
+  await seedTechnicians(db);
 }
 
-seedTechnicians(db);
+const db = { prepare, transaction: withTransaction };
+db.ready = init();
 
 export default db;

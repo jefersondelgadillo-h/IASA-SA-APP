@@ -3,14 +3,14 @@ import db from "../db.js";
 
 const router = Router();
 
-function currentWeekStart() {
-  const row = db.prepare("SELECT week_start FROM weeks ORDER BY week_start DESC LIMIT 1").get();
+async function currentWeekStart() {
+  const row = await db.prepare("SELECT week_start FROM weeks ORDER BY week_start DESC LIMIT 1").get();
   return row ? row.week_start : null;
 }
 
 // Lista de semanas disponibles (mas reciente primero), para poder ver semanas pasadas.
-router.get("/weeks", (req, res) => {
-  const weeks = db.prepare("SELECT week_start, uploaded_at FROM weeks ORDER BY week_start DESC").all();
+router.get("/weeks", async (req, res) => {
+  const weeks = await db.prepare("SELECT week_start, uploaded_at FROM weeks ORDER BY week_start DESC").all();
   res.json(weeks);
 });
 
@@ -20,8 +20,8 @@ router.get("/weeks", (req, res) => {
 // Una misma persona puede tener mas de un codigo (el Excel no siempre usa el
 // mismo codigo para alguien de una semana a otra), asi que se agrupa por
 // nombre+rol y se devuelve la lista de codigos de cada quien.
-router.get("/technicians", (req, res) => {
-  const rows = db
+router.get("/technicians", async (req, res) => {
+  const rows = await db
     .prepare(
       "SELECT code, name, role FROM technicians WHERE active = 1 AND name IS NOT NULL AND role IS NOT NULL ORDER BY role, name"
     )
@@ -42,11 +42,11 @@ router.get("/technicians", (req, res) => {
 // ?role=Mecanico|Electrico
 // ?technician=CODIGO (codigo de Puesto, ej. WPAQUI)
 // ?status=Pendiente|En progreso|Completado|Con problema
-router.get("/schedule", (req, res) => {
-  const week = req.query.week || currentWeekStart();
+router.get("/schedule", async (req, res) => {
+  const week = req.query.week || (await currentWeekStart());
   if (!week) return res.json({ week: null, activities: [] });
 
-  const weekRow = db.prepare("SELECT id FROM weeks WHERE week_start = ?").get(week);
+  const weekRow = await db.prepare("SELECT id FROM weeks WHERE week_start = ?").get(week);
   if (!weekRow) return res.json({ week, activities: [] });
 
   const clauses = ["week_id = ?"];
@@ -65,14 +65,14 @@ router.get("/schedule", (req, res) => {
     params.push(req.query.status);
   }
 
-  const activities = db
+  const activities = await db
     .prepare(
       `SELECT * FROM activities WHERE ${clauses.join(" AND ")} ORDER BY activity_date IS NULL, activity_date, row_order`
     )
     .all(...params);
 
   const nameByCode = new Map(
-    db.prepare("SELECT code, name FROM technicians").all().map((t) => [t.code, t.name])
+    (await db.prepare("SELECT code, name FROM technicians").all()).map((t) => [t.code, t.name])
   );
   const withNames = activities.map((a) => ({
     ...a,

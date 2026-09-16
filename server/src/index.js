@@ -9,7 +9,7 @@ import activitiesRoutes from "./routes/activities.js";
 import adminRoutes from "./routes/admin.js";
 import indicatorsRoutes from "./routes/indicators.js";
 import laminadoresRoutes from "./routes/laminadores.js";
-import "./db.js"; // asegura que la base de datos y las tablas existan al arrancar
+import db from "./db.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -40,6 +40,15 @@ if (fs.existsSync(clientDist)) {
   });
 }
 
-app.listen(PORT, () => {
-  console.log(`API de mantenimiento IASA SA escuchando en http://localhost:${PORT}`);
-});
+// Espera a que las tablas existan (y las migraciones/precargas terminen)
+// antes de aceptar trafico.
+db.ready
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`API de mantenimiento IASA SA escuchando en http://localhost:${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error("No se pudo inicializar la base de datos:", err);
+    process.exit(1);
+  });

@@ -80,7 +80,9 @@ Para probar la app desde el celular sin instalar nada localmente:
 servicio se reinicia (por inactividad, o al volver a desplegar), se
 pierde lo que se haya subido (Excel, cambios de estado) y solo queda
 el roster inicial precargado. Sirve perfecto para probar la
-interfaz y el flujo, pero para el uso real semanal conviene un plan
+interfaz y el flujo, pero para el uso real semanal conviene conectar
+la app a Turso (gratis, ver [`docs/TURSO.md`](docs/TURSO.md)) para que
+los datos queden guardados de forma permanente, o usar un plan de Render
 con disco persistente, o correrlo en un servidor propio (ver abajo).
 
 ## Despliegue (produccion)
@@ -121,10 +123,17 @@ pantalla de inicio"), el navegador la reconoce como app instalable
 
 ## Datos
 
-Se guardan en un archivo SQLite (`server/data/iasa.db`), que se crea
-solo la primera vez que arranca el servidor. No requiere instalar ni
-administrar un motor de base de datos aparte. Conviene incluir ese
+Por defecto se guardan en un archivo SQLite (`server/data/iasa.db`), que
+se crea solo la primera vez que arranca el servidor. No requiere instalar
+ni administrar un motor de base de datos aparte. Conviene incluir ese
 archivo en el respaldo/backup del servidor.
+
+**Importante:** en el plan gratis de Render ese archivo se pierde cada vez
+que el servicio se reinicia (por inactividad o al redesplegar). Para que
+los datos queden guardados de forma permanente sin depender de un disco
+persistente, ver [`docs/TURSO.md`](docs/TURSO.md) — conecta la app a
+[Turso](https://turso.tech) (base de datos SQLite en la nube, con plan
+gratis) en unos minutos, sin cambiar nada mas de como se usa la app.
 
 ## Nota de seguridad
 

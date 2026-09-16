@@ -7,24 +7,24 @@ const router = Router();
 // y registrar reseteos de horometro. Cada laminador tiene su propio
 // historial, completamente separado del resto.
 
-router.get("/laminadores", (req, res) => {
-  const laminadores = db.prepare("SELECT id, name FROM laminadores ORDER BY id").all();
+router.get("/laminadores", async (req, res) => {
+  const laminadores = await db.prepare("SELECT id, name FROM laminadores ORDER BY id").all();
   res.json(laminadores);
 });
 
-router.get("/laminadores/:id/resets", (req, res) => {
-  const laminador = db.prepare("SELECT id, name FROM laminadores WHERE id = ?").get(req.params.id);
+router.get("/laminadores/:id/resets", async (req, res) => {
+  const laminador = await db.prepare("SELECT id, name FROM laminadores WHERE id = ?").get(req.params.id);
   if (!laminador) return res.status(404).json({ error: "Laminador no encontrado." });
 
-  const resets = db
+  const resets = await db
     .prepare("SELECT * FROM laminador_resets WHERE laminador_id = ? ORDER BY reset_date DESC, id DESC")
     .all(laminador.id);
 
   res.json({ laminador, resets });
 });
 
-router.post("/laminadores/:id/resets", (req, res) => {
-  const laminador = db.prepare("SELECT id, name FROM laminadores WHERE id = ?").get(req.params.id);
+router.post("/laminadores/:id/resets", async (req, res) => {
+  const laminador = await db.prepare("SELECT id, name FROM laminadores WHERE id = ?").get(req.params.id);
   if (!laminador) return res.status(404).json({ error: "Laminador no encontrado." });
 
   const { reset_date, hours_before, reason, performed_by } = req.body || {};
@@ -40,14 +40,14 @@ router.post("/laminadores/:id/resets", (req, res) => {
     return res.status(400).json({ error: "Indica quien realizo el reseteo." });
   }
 
-  const info = db
+  const info = await db
     .prepare(
       `INSERT INTO laminador_resets (laminador_id, reset_date, hours_before, reason, performed_by)
        VALUES (?, ?, ?, ?, ?)`
     )
     .run(laminador.id, reset_date, hours, reason && reason.trim() ? reason.trim() : null, performed_by.trim());
 
-  const created = db.prepare("SELECT * FROM laminador_resets WHERE id = ?").get(info.lastInsertRowid);
+  const created = await db.prepare("SELECT * FROM laminador_resets WHERE id = ?").get(info.lastInsertRowid);
   res.json(created);
 });
 

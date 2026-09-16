@@ -12,21 +12,20 @@ const seedPath = path.join(__dirname, "..", "..", "config", "technicians-seed.js
  * Asi el roster conocido queda listo desde el primer arranque, sin pisar
  * nunca una edicion manual.
  */
-export function seedTechnicians(db) {
+export async function seedTechnicians(db) {
   if (!fs.existsSync(seedPath)) return;
   const { technicians } = JSON.parse(fs.readFileSync(seedPath, "utf8"));
 
-  const insert = db.prepare(`
-    INSERT INTO technicians (code, name, role) VALUES (?, ?, ?)
-    ON CONFLICT(code) DO NOTHING
-  `);
+  await db.transaction(async (tx) => {
+    const insert = tx.prepare(`
+      INSERT INTO technicians (code, name, role) VALUES (?, ?, ?)
+      ON CONFLICT(code) DO NOTHING
+    `);
 
-  const tx = db.transaction(() => {
     for (const t of technicians) {
       for (const code of t.codes) {
-        insert.run(code, t.name, t.role);
+        await insert.run(code, t.name, t.role);
       }
     }
   });
-  tx();
 }

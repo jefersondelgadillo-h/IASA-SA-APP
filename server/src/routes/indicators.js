@@ -3,8 +3,8 @@ import db from "../db.js";
 
 const router = Router();
 
-function currentWeekStart() {
-  const row = db.prepare("SELECT week_start FROM weeks ORDER BY week_start DESC LIMIT 1").get();
+async function currentWeekStart() {
+  const row = await db.prepare("SELECT week_start FROM weeks ORDER BY week_start DESC LIMIT 1").get();
   return row ? row.week_start : null;
 }
 
@@ -12,9 +12,9 @@ function currentWeekStart() {
 // entran a la app. Vienen de otro sistema (ej. SAP/avisos) y el supervisor
 // los carga a mano por semana desde el panel admin, separados por linea de
 // produccion (Crown / Tecnal).
-router.get("/indicators", (req, res) => {
-  const week = req.query.week || currentWeekStart();
-  const row = week ? db.prepare("SELECT * FROM week_indicators WHERE week_start = ?").get(week) : null;
+router.get("/indicators", async (req, res) => {
+  const week = req.query.week || (await currentWeekStart());
+  const row = week ? await db.prepare("SELECT * FROM week_indicators WHERE week_start = ?").get(week) : null;
 
   res.json({
     week,
