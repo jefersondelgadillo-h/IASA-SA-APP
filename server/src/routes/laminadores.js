@@ -1,7 +1,20 @@
 import { Router } from "express";
 import db from "../db.js";
+import { adminAuth } from "../middleware/adminAuth.js";
 
 const router = Router();
+
+const RODILLO_ROW_KEYS = ["R1AR", "R1DR", "R2AR", "R2DR"];
+const RODILLO_POINT_COLUMNS = Array.from({ length: 10 }, (_, i) => `point_${i + 1}`);
+const RODILLO_ADMIN_FIELDS = [
+  "orden_programada",
+  "ultimo_cambio_rolos",
+  "ultimo_rectificado",
+  "rectificador_usado",
+  "conclusion",
+  "comentario",
+  "revisado_por",
+];
 
 // Seccion de acceso libre (sin clave de administrador): cualquiera puede ver
 // y registrar reseteos de horometro. Cada laminador tiene su propio
@@ -162,6 +175,102 @@ router.post("/laminadores/:id/checklists", async (req, res) => {
 
   const report = await db.prepare("SELECT * FROM checklist_reports WHERE id = ?").get(reportId);
   res.json(report);
+});
+
+// --- Informe de medicion de rodillos (galga 0,05 mm) ---
+// Cada envio de un operario es una fila del informe (rodillo fijo/movil,
+// antes/despues de rectificar). Mantenimiento completa despues los datos
+// de la orden/rectificacion y la conclusion de cada informe.
+
+router.get("/laminadores/:id/rodillo-reports", async (req, res) => {
+  const laminador = await db.prepare("SELECT id, name FROM laminadores WHERE id = ?").get(req.params.id);
+  if (!laminador) return res.status(404).json({ error: "Laminador no encontrado." });
+
+  const reports = await db
+    .prepare("SELECT * FROM rodillo_reports WHERE laminador_id = ? ORDER BY fecha DESC, id DESC")
+    .all(laminador.id);
+
+  res.json({ laminador, reports });
+});
+
+router.get("/laminadores/:id/rodillo-reports/:reportId", async (req, res) => {
+  const report = await db
+    .prepare("SELECT * FROM rodillo_reports WHERE id = ? AND laminador_id = ?")
+    .get(req.params.reportId, req.params.id);
+  if (!report) return res.status(404).json({ error: "Informe no encontrado." });
+  res.json(report);
+});
+
+// Envio del operario: que fila del informe midio, fecha, hora/turno y las
+// 10 lecturas de la galga (1 = pasa, 0 = no pasa).
+router.post("/laminadores/:id/rodillo-reports", async (req, res) => {
+  const laminador = await db.prepare("SELECT id, name FROM laminadores WHERE id = ?").get(req.params.id);
+  if (!laminador) return res.status(404).json({ error: "Laminador no encontrado." });
+
+  const { row_key, fecha, hora, turno, points, ejecutado_por } = req.body || {};
+
+  if (!RODILLO_ROW_KEYS.includes(row_key)) {
+    return res.status(400).json({ error: "Indica que rodillo y estado se midio." });
+  }
+  if (!fecha || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+    return res.status(400).json({ error: "Indica la fecha de la medicion." });
+  }
+  if (!ejecutado_por || !String(ejecutado_por).trim()) {
+    return res.status(400).json({ error: "Indica quien realizo la medicion." });
+  }
+  if (!Array.isArray(points) || points.length !== 10 || points.some((p) => p !== 0 && p !== 1)) {
+    return res.status(400).json({ error: "Faltan las 10 lecturas de la galga (pasa/no pasa)." });
+  }
+
+  const info = await db
+    .prepare(
+      `INSERT INTO rodillo_reports
+        (laminador_id, row_key, fecha, hora, turno, ${RODILLO_POINT_COLUMNS.join(", ")}, ejecutado_por)
+       VALUES (?, ?, ?, ?, ?, ${RODILLO_POINT_COLUMNS.map(() => "?").join(", ")}, ?)`
+    )
+    .run(
+      laminador.id,
+      row_key,
+      fecha,
+      hora && hora.trim() ? hora.trim() : null,
+      turno && turno.trim() ? turno.trim() : null,
+      ...points,
+      ejecutado_por.trim()
+    );
+
+  const created = await db.prepare("SELECT * FROM rodillo_reports WHERE id = ?").get(info.lastInsertRowid);
+  res.json(created);
+});
+
+// Mantenimiento completa la orden/rectificacion, la conclusion y quien
+// reviso. Protegido con la clave de administrador.
+router.patch("/laminadores/:id/rodillo-reports/:reportId", adminAuth, async (req, res) => {
+  const report = await db
+    .prepare("SELECT * FROM rodillo_reports WHERE id = ? AND laminador_id = ?")
+    .get(req.params.reportId, req.params.id);
+  if (!report) return res.status(404).json({ error: "Informe no encontrado." });
+
+  const body = req.body || {};
+  const updates = {};
+  for (const field of RODILLO_ADMIN_FIELDS) {
+    if (field in body) {
+      const v = body[field];
+      updates[field] = v && String(v).trim() ? String(v).trim() : null;
+    }
+  }
+  if (Object.keys(updates).length === 0) {
+    return res.status(400).json({ error: "No hay cambios para guardar." });
+  }
+
+  const setClause = Object.keys(updates)
+    .map((f) => `${f} = ?`)
+    .join(", ");
+  await db
+    .prepare(`UPDATE rodillo_reports SET ${setClause}, updated_at = datetime('now') WHERE id = ?`)
+    .run(...Object.values(updates), report.id);
+
+  const updated = await db.prepare("SELECT * FROM rodillo_reports WHERE id = ?").get(report.id);
+  res.json(updated);
 });
 
 export default router;
