@@ -75,7 +75,6 @@ function MedicionSection({ title, prefix, report }) {
       </div>
       <p className="text-sm text-gray-500 mb-1">
         📅 {formatDate(fecha)} {report[`${prefix}_hora`] && `· 🕒 ${report[`${prefix}_hora`]}`}
-        {report[`${prefix}_turno`] && `· ${report[`${prefix}_turno`]}`}
       </p>
       <p className="text-sm text-gray-500 mb-3">👤 Ejecutado por: {report[`${prefix}_ejecutado_por`]}</p>
       <PointsGrid prefix={prefix} report={report} />
