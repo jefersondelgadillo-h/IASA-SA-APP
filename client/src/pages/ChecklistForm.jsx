@@ -85,7 +85,7 @@ export default function ChecklistForm() {
         <div>
           <p className="font-bold">{laminador?.name || "Laminador"}</p>
           <p className="text-xs text-white/80">
-            Checklist diario {items.length > 0 && `· ${answeredCount}/${items.length}`}
+            Checklist de componentes {items.length > 0 && `· ${answeredCount}/${items.length}`}
           </p>
         </div>
       </header>
