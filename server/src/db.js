@@ -123,18 +123,6 @@ CREATE INDEX IF NOT EXISTS idx_activities_week ON activities(week_id);
 CREATE INDEX IF NOT EXISTS idx_activities_codes ON activities(assigned_codes);
 CREATE INDEX IF NOT EXISTS idx_history_activity ON activity_history(activity_id);
 
-CREATE TABLE IF NOT EXISTS week_indicators (
-  week_start TEXT PRIMARY KEY REFERENCES weeks(week_start) ON DELETE CASCADE,
-  fallas_equipos_crown_pct REAL,
-  fallas_equipos_tecnal_pct REAL,
-  fallas_equipos_meta REAL NOT NULL DEFAULT 3,
-  cumplimiento_anual_crown_pct REAL,
-  cumplimiento_anual_tecnal_pct REAL,
-  cumplimiento_anual_meta REAL NOT NULL DEFAULT 90,
-  updated_at TEXT,
-  updated_by TEXT
-);
-
 CREATE TABLE IF NOT EXISTS laminadores (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL UNIQUE
@@ -234,21 +222,16 @@ CREATE TABLE IF NOT EXISTS rodillo_reports (
 CREATE INDEX IF NOT EXISTS idx_rodillo_reports_laminador ON rodillo_reports(laminador_id);
 `;
 
-// Crea las tablas si no existen, corre la migracion de indicadores si hace
-// falta, precarga los 8 laminadores y el roster inicial de tecnicos. Se debe
-// esperar (await db.ready) antes de arrancar el servidor.
+// Crea las tablas si no existen, corre migraciones si hace falta, precarga
+// los 8 laminadores y el roster inicial de tecnicos. Se debe esperar
+// (await db.ready) antes de arrancar el servidor.
 async function init() {
   await client.execute("PRAGMA foreign_keys = ON");
 
-  // Migracion: si "week_indicators" existe con el esquema viejo (un solo
-  // valor total por indicador) se recrea con el esquema nuevo (Crown/Tecnal
-  // por separado). El dato manual anterior no se puede convertir
-  // automaticamente a las dos lineas, asi que se pierde.
-  const cols = await client.execute("PRAGMA table_info(week_indicators)");
-  const existingCols = cols.rows.map((c) => c.name);
-  if (existingCols.length > 0 && !existingCols.includes("fallas_equipos_crown_pct")) {
-    await client.execute("DROP TABLE week_indicators");
-  }
+  // Los indicadores semanales (Fallas de equipos / Cumpl. anual) se
+  // quitaron de la programacion semanal; se elimina la tabla si quedo de
+  // una version anterior.
+  await client.execute("DROP TABLE IF EXISTS week_indicators");
 
   // Migracion: "rodillo_reports" con un esquema viejo (una fila por estado
   // antes/despues, o con turno para el rodillo movil) se recrea con el

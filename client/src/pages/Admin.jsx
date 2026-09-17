@@ -7,7 +7,6 @@ import SectionHeader from "../components/SectionHeader.jsx";
 import StatTile from "../components/StatTile.jsx";
 import ProgressBar from "../components/ProgressBar.jsx";
 import EmptyState from "../components/EmptyState.jsx";
-import CompanyIndicators from "../components/CompanyIndicators.jsx";
 import Logo from "../components/Logo.jsx";
 
 const STATUS_TONES = { Pendiente: "gray", "En progreso": "amber", Completado: "green", "Con problema": "red" };
@@ -76,132 +75,6 @@ function TechnicianRow({ technician, onSaved }) {
   );
 }
 
-function IndicatorLineInputs({
-  title,
-  meta,
-  onMetaChange,
-  crown,
-  onCrownChange,
-  crownPlaceholder,
-  tecnal,
-  onTecnalChange,
-  tecnalPlaceholder,
-}) {
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-1">
-        <label className="text-xs text-gray-500">{title}</label>
-        <div className="flex items-center gap-1">
-          <span className="text-[10px] text-gray-400">Meta</span>
-          <input
-            type="number"
-            step="0.01"
-            value={meta}
-            onChange={(e) => onMetaChange(e.target.value)}
-            className="w-16 border border-gray-300 rounded-lg p-1 text-xs"
-          />
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <label className="block text-[10px] text-gray-400 mb-0.5">Crown</label>
-          <input
-            type="number"
-            step="0.01"
-            value={crown}
-            onChange={(e) => onCrownChange(e.target.value)}
-            placeholder={crownPlaceholder}
-            className="w-full border border-gray-300 rounded-lg p-2 text-sm"
-          />
-        </div>
-        <div>
-          <label className="block text-[10px] text-gray-400 mb-0.5">Tecnal</label>
-          <input
-            type="number"
-            step="0.01"
-            value={tecnal}
-            onChange={(e) => onTecnalChange(e.target.value)}
-            placeholder={tecnalPlaceholder}
-            className="w-full border border-gray-300 rounded-lg p-2 text-sm"
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function IndicatorsForm({ week, indicators, onSaved }) {
-  const [fallasCrown, setFallasCrown] = useState(indicators.fallas_equipos.crown ?? "");
-  const [fallasTecnal, setFallasTecnal] = useState(indicators.fallas_equipos.tecnal ?? "");
-  const [fallasMeta, setFallasMeta] = useState(indicators.fallas_equipos.meta ?? 3);
-  const [cumplCrown, setCumplCrown] = useState(indicators.cumplimiento_anual.crown ?? "");
-  const [cumplTecnal, setCumplTecnal] = useState(indicators.cumplimiento_anual.tecnal ?? "");
-  const [cumplMeta, setCumplMeta] = useState(indicators.cumplimiento_anual.meta ?? 90);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [err, setErr] = useState("");
-
-  async function handleSave() {
-    setSaving(true);
-    setErr("");
-    setSaved(false);
-    try {
-      await onSaved({
-        week,
-        fallas_equipos_crown_pct: fallasCrown,
-        fallas_equipos_tecnal_pct: fallasTecnal,
-        fallas_equipos_meta: fallasMeta,
-        cumplimiento_anual_crown_pct: cumplCrown,
-        cumplimiento_anual_tecnal_pct: cumplTecnal,
-        cumplimiento_anual_meta: cumplMeta,
-      });
-      setSaved(true);
-    } catch (e) {
-      setErr(e.message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div className="space-y-4">
-      <IndicatorLineInputs
-        title="% Fallas de equipos"
-        meta={fallasMeta}
-        onMetaChange={setFallasMeta}
-        crown={fallasCrown}
-        onCrownChange={setFallasCrown}
-        crownPlaceholder="ej. 6.24"
-        tecnal={fallasTecnal}
-        onTecnalChange={setFallasTecnal}
-        tecnalPlaceholder="ej. 4.80"
-      />
-      <IndicatorLineInputs
-        title="% Cumplimiento programa anual"
-        meta={cumplMeta}
-        onMetaChange={setCumplMeta}
-        crown={cumplCrown}
-        onCrownChange={setCumplCrown}
-        crownPlaceholder="ej. 85.0"
-        tecnal={cumplTecnal}
-        onTecnalChange={setCumplTecnal}
-        tecnalPlaceholder="ej. 92.0"
-      />
-      <div className="flex items-center gap-3">
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="text-xs bg-iasa-blue text-white rounded-full px-4 py-1.5 disabled:opacity-50"
-        >
-          {saving ? "Guardando..." : "Guardar indicadores"}
-        </button>
-        {saved && <span className="text-xs text-green-700">Guardado ✓</span>}
-        {err && <span className="text-xs text-red-600">{err}</span>}
-      </div>
-    </div>
-  );
-}
-
 export default function Admin() {
   const [password, setPassword] = useState(getAdminPassword() || "");
   const [authed, setAuthed] = useState(!!getAdminPassword());
@@ -222,9 +95,6 @@ export default function Admin() {
 
   const [technicians, setTechnicians] = useState([]);
   const [techError, setTechError] = useState("");
-
-  const [indicators, setIndicators] = useState(null);
-  const [indicatorsError, setIndicatorsError] = useState("");
 
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
@@ -279,25 +149,8 @@ export default function Admin() {
     }
   }
 
-  async function loadIndicators(week) {
-    setIndicatorsError("");
-    try {
-      setIndicators(await api.getIndicators(week));
-    } catch (err) {
-      setIndicatorsError(err.message);
-    }
-  }
-
-  async function handleSaveIndicators(body) {
-    await api.adminUpdateIndicators(getAdminPassword(), body);
-    await loadIndicators(body.week);
-  }
-
-  // Cambia de semana en el tablero, sus indicadores manuales y el formulario
-  // de carga de indicadores a la vez, para que todo quede consistente.
   function handleWeekChange(week) {
     loadDashboard(week);
-    loadIndicators(week);
   }
 
   async function handleDeleteWeek() {
@@ -311,7 +164,6 @@ export default function Admin() {
       setWeeksList(remaining);
       const nextWeek = remaining[0]?.week_start;
       await loadDashboard(nextWeek);
-      await loadIndicators(nextWeek);
     } catch (err) {
       setDeleteWeekError(err.message);
     } finally {
@@ -323,7 +175,6 @@ export default function Admin() {
     if (authed) {
       loadDashboard();
       loadTechnicians();
-      loadIndicators();
       loadWeeksList();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -342,7 +193,6 @@ export default function Admin() {
       setNewTechnicianCodes(res.new_technicians || []);
       setFile(null);
       loadDashboard(res.week_start);
-      loadIndicators(res.week_start);
       loadTechnicians();
       loadWeeksList();
     } catch (err) {
@@ -470,24 +320,6 @@ export default function Admin() {
               </p>
             )}
           </form>
-        </section>
-
-        {indicators && <CompanyIndicators indicators={indicators} />}
-
-        <section className="bg-white rounded-2xl shadow-sm p-4">
-          <SectionHeader icon="✍️" title="Cargar indicadores (Fallas de equipos / Cumpl. anual)" />
-          <p className="text-xs text-gray-500 mb-3">
-            Vienen de otro sistema (ej. SAP/avisos), separados por linea de produccion (Crown / Tecnal) — se cargan
-            por semana, tomando el dato de tu reporte. Usa el selector de semana del tablero de abajo para elegir
-            cual estas cargando/corrigiendo (ahora mismo: <strong>{dashboardWeek || "sin semana"}</strong>).
-          </p>
-          {indicatorsError && <p className="text-sm text-red-600 mb-2">{indicatorsError}</p>}
-          {/* indicators.week === dashboardWeek evita montar el formulario con datos
-              de la semana anterior mientras la nueva todavia esta cargando */}
-          {indicators && dashboardWeek && indicators.week === dashboardWeek && (
-            <IndicatorsForm key={dashboardWeek} week={dashboardWeek} indicators={indicators} onSaved={handleSaveIndicators} />
-          )}
-          {!dashboardWeek && <p className="text-xs text-gray-400">Sube una semana primero para poder cargar sus indicadores.</p>}
         </section>
 
         <section className="bg-white rounded-2xl shadow-sm p-4">

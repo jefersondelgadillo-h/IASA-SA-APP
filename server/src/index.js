@@ -7,7 +7,6 @@ import { fileURLToPath } from "node:url";
 import scheduleRoutes from "./routes/schedule.js";
 import activitiesRoutes from "./routes/activities.js";
 import adminRoutes from "./routes/admin.js";
-import indicatorsRoutes from "./routes/indicators.js";
 import laminadoresRoutes from "./routes/laminadores.js";
 import db from "./db.js";
 
@@ -23,7 +22,6 @@ app.get("/api/health", (req, res) => res.json({ ok: true, service: "iasa-manteni
 app.use("/api", scheduleRoutes);
 app.use("/api", activitiesRoutes);
 app.use("/api", adminRoutes);
-app.use("/api", indicatorsRoutes);
 app.use("/api", laminadoresRoutes);
 
 app.use((err, req, res, next) => {
