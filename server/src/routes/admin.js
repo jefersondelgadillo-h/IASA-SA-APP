@@ -148,6 +148,26 @@ const EXPORT_HEADERS = [
   "Actualizado el",
 ];
 
+// Arma la hoja (o headers vacios si no hay filas) y la envia como .xlsx o
+// .csv segun format. Usado por todos los endpoints de exportacion del panel.
+function sendExport(res, format, rows, headers, filenameBase, sheetName) {
+  const sheet = rows.length > 0 ? XLSX.utils.json_to_sheet(rows) : XLSX.utils.aoa_to_sheet([headers]);
+
+  if (format === "csv") {
+    const csv = XLSX.utils.sheet_to_csv(sheet);
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filenameBase}.csv"`);
+    return res.send("﻿" + csv); // BOM para que Excel muestre bien las tildes
+  }
+
+  const book = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(book, sheet, sheetName);
+  const buffer = XLSX.write(book, { type: "buffer", bookType: "xlsx" });
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", `attachment; filename="${filenameBase}.xlsx"`);
+  res.send(buffer);
+}
+
 // Exporta el historial completo de cambios de estado (todas las semanas
 // cargadas hasta ahora) para que el supervisor lo analice en Excel/CSV.
 // Protegido con la clave de admin: solo el supervisor puede descargarlo.
@@ -189,23 +209,162 @@ router.get("/admin/export", adminAuth, async (req, res) => {
     "Actualizado el": new Date(r.updated_at).toLocaleString(),
   }));
 
-  const sheet =
-    exportRows.length > 0 ? XLSX.utils.json_to_sheet(exportRows) : XLSX.utils.aoa_to_sheet([EXPORT_HEADERS]);
-  const filenameBase = "historial_mantenimiento_iasa";
+  sendExport(res, format, exportRows, EXPORT_HEADERS, "historial_mantenimiento_iasa", "Historial");
+});
 
-  if (format === "csv") {
-    const csv = XLSX.utils.sheet_to_csv(sheet);
-    res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename="${filenameBase}.csv"`);
-    return res.send("﻿" + csv); // BOM para que Excel muestre bien las tildes
-  }
+// --- Administracion del historial de laminadores (checklists, mediciones
+// de rodillos y reseteos de horometro): exportar y eliminar registros.
+// El registro (llenado por produccion) es publico; borrarlo o exportar
+// todo el historial es exclusivo del administrador. ---
 
-  const book = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(book, sheet, "Historial");
-  const buffer = XLSX.write(book, { type: "buffer", bookType: "xlsx" });
-  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-  res.setHeader("Content-Disposition", `attachment; filename="${filenameBase}.xlsx"`);
-  res.send(buffer);
+const CHECKLIST_EXPORT_HEADERS = [
+  "Laminador",
+  "Fecha",
+  "Responsable",
+  "Subsistema",
+  "Componente",
+  "Accion",
+  "Estado",
+  "Comentario",
+];
+
+router.get("/admin/laminadores/checklists/export", adminAuth, async (req, res) => {
+  const format = req.query.format === "csv" ? "csv" : "xlsx";
+
+  const rows = await db
+    .prepare(
+      `SELECT l.name AS laminador, cr.report_date, cr.performed_by, ci.sub_sistema, ci.componente, ci.accion,
+              cri.estado, cri.comentario
+       FROM checklist_report_items cri
+       JOIN checklist_items ci ON ci.id = cri.checklist_item_id
+       JOIN checklist_reports cr ON cr.id = cri.report_id
+       JOIN laminadores l ON l.id = cr.laminador_id
+       ORDER BY cr.report_date DESC, l.name, ci.order_index`
+    )
+    .all();
+
+  const exportRows = rows.map((r) => ({
+    Laminador: r.laminador,
+    Fecha: r.report_date,
+    Responsable: r.performed_by,
+    Subsistema: r.sub_sistema,
+    Componente: r.componente,
+    Accion: r.accion,
+    Estado: r.estado || "Sin revisar",
+    Comentario: r.comentario || "",
+  }));
+
+  sendExport(res, format, exportRows, CHECKLIST_EXPORT_HEADERS, "checklists_laminadores_iasa", "Checklists");
+});
+
+router.delete("/admin/laminadores/checklists/:reportId", adminAuth, async (req, res) => {
+  const report = await db.prepare("SELECT id FROM checklist_reports WHERE id = ?").get(req.params.reportId);
+  if (!report) return res.status(404).json({ error: "Checklist no encontrado." });
+  await db.prepare("DELETE FROM checklist_reports WHERE id = ?").run(report.id);
+  res.json({ ok: true });
+});
+
+const RODILLO_EXPORT_HEADERS = [
+  "Laminador",
+  "Rodillo",
+  "Antes - Fecha",
+  "Antes - Hora",
+  ...Array.from({ length: 10 }, (_, i) => `Antes - P${i + 1}`),
+  "Antes - Ejecutado por",
+  "Despues - Fecha",
+  "Despues - Hora",
+  ...Array.from({ length: 10 }, (_, i) => `Despues - P${i + 1}`),
+  "Despues - Ejecutado por",
+  "Orden programada",
+  "Ultimo cambio de rolos",
+  "Ultimo rectificado",
+  "Rectificador usado",
+  "Conclusion",
+  "Comentario",
+  "Revisado por",
+];
+
+function pointLabel(v) {
+  if (v === 1) return "Pasa";
+  if (v === 0) return "No pasa";
+  return "";
+}
+
+router.get("/admin/laminadores/rodillo-reports/export", adminAuth, async (req, res) => {
+  const format = req.query.format === "csv" ? "csv" : "xlsx";
+
+  const rows = await db
+    .prepare(
+      `SELECT l.name AS laminador, rr.*
+       FROM rodillo_reports rr
+       JOIN laminadores l ON l.id = rr.laminador_id
+       ORDER BY COALESCE(rr.despues_fecha, rr.antes_fecha) DESC, rr.id DESC`
+    )
+    .all();
+
+  const exportRows = rows.map((r) => {
+    const row = {
+      Laminador: r.laminador,
+      Rodillo: r.rodillo === "fijo" ? "Fijo" : "Movil",
+      "Antes - Fecha": r.antes_fecha || "",
+      "Antes - Hora": r.antes_hora || "",
+    };
+    for (let i = 1; i <= 10; i++) row[`Antes - P${i}`] = pointLabel(r[`antes_point_${i}`]);
+    row["Antes - Ejecutado por"] = r.antes_ejecutado_por || "";
+    row["Despues - Fecha"] = r.despues_fecha || "";
+    row["Despues - Hora"] = r.despues_hora || "";
+    for (let i = 1; i <= 10; i++) row[`Despues - P${i}`] = pointLabel(r[`despues_point_${i}`]);
+    row["Despues - Ejecutado por"] = r.despues_ejecutado_por || "";
+    row["Orden programada"] = r.orden_programada || "";
+    row["Ultimo cambio de rolos"] = r.ultimo_cambio_rolos || "";
+    row["Ultimo rectificado"] = r.ultimo_rectificado || "";
+    row["Rectificador usado"] = r.rectificador_usado || "";
+    row["Conclusion"] = r.conclusion || "";
+    row["Comentario"] = r.comentario || "";
+    row["Revisado por"] = r.revisado_por || "";
+    return row;
+  });
+
+  sendExport(res, format, exportRows, RODILLO_EXPORT_HEADERS, "mediciones_rodillos_iasa", "Mediciones");
+});
+
+router.delete("/admin/laminadores/rodillo-reports/:reportId", adminAuth, async (req, res) => {
+  const report = await db.prepare("SELECT id FROM rodillo_reports WHERE id = ?").get(req.params.reportId);
+  if (!report) return res.status(404).json({ error: "Informe no encontrado." });
+  await db.prepare("DELETE FROM rodillo_reports WHERE id = ?").run(report.id);
+  res.json({ ok: true });
+});
+
+const RESETS_EXPORT_HEADERS = ["Laminador", "Fecha", "Horas antes del reseteo", "Motivo", "Responsable"];
+
+router.get("/admin/laminadores/resets/export", adminAuth, async (req, res) => {
+  const format = req.query.format === "csv" ? "csv" : "xlsx";
+
+  const rows = await db
+    .prepare(
+      `SELECT l.name AS laminador, r.reset_date, r.hours_before, r.reason, r.performed_by
+       FROM laminador_resets r
+       JOIN laminadores l ON l.id = r.laminador_id
+       ORDER BY r.reset_date DESC, r.id DESC`
+    )
+    .all();
+
+  const exportRows = rows.map((r) => ({
+    Laminador: r.laminador,
+    Fecha: r.reset_date,
+    "Horas antes del reseteo": r.hours_before,
+    Motivo: r.reason || "",
+    Responsable: r.performed_by,
+  }));
+
+  sendExport(res, format, exportRows, RESETS_EXPORT_HEADERS, "reseteos_horometro_iasa", "Reseteos");
+});
+
+router.delete("/admin/laminadores/resets/:resetId", adminAuth, async (req, res) => {
+  const reset = await db.prepare("SELECT id FROM laminador_resets WHERE id = ?").get(req.params.resetId);
+  if (!reset) return res.status(404).json({ error: "Reseteo no encontrado." });
+  await db.prepare("DELETE FROM laminador_resets WHERE id = ?").run(reset.id);
+  res.json({ ok: true });
 });
 
 // Elimina por completo la programacion de una semana (actividades y su
