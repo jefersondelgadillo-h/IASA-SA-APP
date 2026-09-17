@@ -16,6 +16,20 @@ async function request(path, options = {}) {
   return data;
 }
 
+// Descarga un archivo protegido con la clave de admin (export a Excel/CSV).
+async function downloadFile(path, password, fallbackFilename) {
+  const res = await fetch(`${BASE}${path}`, { headers: { "x-admin-password": password } });
+  if (!res.ok) {
+    const isJson = res.headers.get("content-type")?.includes("application/json");
+    const data = isJson ? await res.json() : null;
+    throw new Error(data?.error || `Error ${res.status}`);
+  }
+  const blob = await res.blob();
+  const match = (res.headers.get("content-disposition") || "").match(/filename="?([^"]+)"?/);
+  const filename = match ? match[1] : fallbackFilename;
+  return { blob, filename };
+}
+
 export const api = {
   getTechnicians: () => request("/technicians"),
   getWeeks: () => request("/weeks"),
@@ -45,6 +59,27 @@ export const api = {
       headers: { "x-admin-password": password },
       body: JSON.stringify(body),
     }),
+  adminDeleteLaminadorChecklist: (password, reportId) =>
+    request(`/admin/laminadores/checklists/${reportId}`, {
+      method: "DELETE",
+      headers: { "x-admin-password": password },
+    }),
+  adminExportLaminadorChecklists: (password, format = "xlsx") =>
+    downloadFile(`/admin/laminadores/checklists/export?format=${format}`, password, `checklists.${format}`),
+  adminDeleteRodilloReport: (password, reportId) =>
+    request(`/admin/laminadores/rodillo-reports/${reportId}`, {
+      method: "DELETE",
+      headers: { "x-admin-password": password },
+    }),
+  adminExportRodilloReports: (password, format = "xlsx") =>
+    downloadFile(`/admin/laminadores/rodillo-reports/export?format=${format}`, password, `mediciones_rodillos.${format}`),
+  adminDeleteLaminadorReset: (password, resetId) =>
+    request(`/admin/laminadores/resets/${resetId}`, {
+      method: "DELETE",
+      headers: { "x-admin-password": password },
+    }),
+  adminExportLaminadorResets: (password, format = "xlsx") =>
+    downloadFile(`/admin/laminadores/resets/export?format=${format}`, password, `reseteos_horometro.${format}`),
 
   adminLogin: (password) =>
     request("/admin/login", { method: "POST", headers: { "x-admin-password": password } }),
@@ -71,18 +106,6 @@ export const api = {
     }),
   adminDeleteWeek: (password, weekStart) =>
     request(`/admin/weeks/${weekStart}`, { method: "DELETE", headers: { "x-admin-password": password } }),
-  adminExportHistory: async (password, format = "xlsx") => {
-    const res = await fetch(`${BASE}/admin/export?format=${format}`, {
-      headers: { "x-admin-password": password },
-    });
-    if (!res.ok) {
-      const isJson = res.headers.get("content-type")?.includes("application/json");
-      const data = isJson ? await res.json() : null;
-      throw new Error(data?.error || `Error ${res.status}`);
-    }
-    const blob = await res.blob();
-    const match = (res.headers.get("content-disposition") || "").match(/filename="?([^"]+)"?/);
-    const filename = match ? match[1] : `historial.${format}`;
-    return { blob, filename };
-  },
+  adminExportHistory: (password, format = "xlsx") =>
+    downloadFile(`/admin/export?format=${format}`, password, `historial.${format}`),
 };

@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api.js";
 import { getAdminPassword, setAdminPassword, clearAdminPassword } from "../lib/session.js";
+import { downloadBlob } from "../lib/download.js";
 import StatusBadge from "../components/StatusBadge.jsx";
 import SectionHeader from "../components/SectionHeader.jsx";
 import StatTile from "../components/StatTile.jsx";
 import ProgressBar from "../components/ProgressBar.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import Logo from "../components/Logo.jsx";
+import LaminadoresAdminSection from "../components/LaminadoresAdminSection.jsx";
 
 const STATUS_TONES = { Pendiente: "gray", "En progreso": "amber", Completado: "green", "Con problema": "red" };
 
@@ -207,14 +209,7 @@ export default function Admin() {
     setExportError("");
     try {
       const { blob, filename } = await api.adminExportHistory(getAdminPassword(), format);
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, filename);
     } catch (err) {
       setExportError(err.message);
     } finally {
@@ -346,6 +341,8 @@ export default function Admin() {
           </div>
           {exportError && <p className="text-sm text-red-600 mt-2">{exportError}</p>}
         </section>
+
+        <LaminadoresAdminSection />
 
         <section className="bg-white rounded-2xl shadow-sm p-4">
           <SectionHeader
