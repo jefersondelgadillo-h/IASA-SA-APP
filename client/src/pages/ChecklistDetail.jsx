@@ -54,7 +54,9 @@ export default function ChecklistDetail() {
         </div>
         <div>
           <p className="font-bold">{laminador?.name || "Laminador"}</p>
-          <p className="text-xs text-white/80">Checklist {report ? formatDate(report.report_date) : ""}</p>
+          <p className="text-xs text-white/80">
+            Checklist de componentes {report ? formatDate(report.report_date) : ""}
+          </p>
         </div>
       </header>
 

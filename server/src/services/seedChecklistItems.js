@@ -6,7 +6,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const seedPath = path.join(__dirname, "..", "..", "config", "checklist-items-seed.json");
 
 /**
- * Carga el checklist diario de laminadores (server/config/checklist-items-seed.json)
+ * Carga el checklist de componentes de laminadores (server/config/checklist-items-seed.json)
  * en la tabla checklist_items, una sola vez: si ya hay filas cargadas no hace nada
  * (no hay una clave natural unica para los items, asi que se controla por conteo).
  */

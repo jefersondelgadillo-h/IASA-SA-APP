@@ -140,7 +140,7 @@ CREATE TABLE IF NOT EXISTS laminador_resets (
 
 CREATE INDEX IF NOT EXISTS idx_laminador_resets_laminador ON laminador_resets(laminador_id);
 
--- Checklist diario de laminadores (mismo listado para los 8, ver
+-- Checklist de componentes de laminadores (mismo listado para los 8, ver
 -- server/config/checklist-items-seed.json). Los operadores de produccion
 -- llenan un reporte por dia/turno; mantenimiento lo revisa despues.
 CREATE TABLE IF NOT EXISTS checklist_items (

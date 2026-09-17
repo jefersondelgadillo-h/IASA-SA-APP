@@ -1,5 +1,5 @@
 {
-  "_comment": "Checklist diario de laminadores TECNAL, tomado de la hoja 'Reporte Operadores' del Informe de medicion de rodillos laminadores. Mismo listado para los 8 laminadores.",
+  "_comment": "Checklist de componentes de laminadores TECNAL, tomado de la hoja 'Reporte Operadores' del Informe de medicion de rodillos laminadores. Mismo listado para los 8 laminadores.",
   "items": [
     { "sub_sistema": "MOTOR", "componente": "MOTOR ELÉCTRICO 150 HP", "accion": "Inspeccionar estado y ajustar borneras del motor\nVerificar lemitas y estado del ventilador deflector" },
     { "sub_sistema": "MOTOR", "componente": "MOTOR ELÉCTRICO 150 HP", "accion": "Medir aislamiento del motor en CCM" },

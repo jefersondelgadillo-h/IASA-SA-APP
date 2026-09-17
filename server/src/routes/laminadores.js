@@ -65,7 +65,7 @@ router.post("/laminadores/:id/resets", async (req, res) => {
   res.json(created);
 });
 
-// --- Checklist diario (mismo listado de items para los 8 laminadores) ---
+// --- Checklist de componentes (mismo listado de items para los 8 laminadores) ---
 
 // Los 30 items fijos del checklist (subsistema, componente, accion a revisar),
 // para armar el formulario. No cambian por laminador ni por reporte.

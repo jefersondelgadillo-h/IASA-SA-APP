@@ -168,7 +168,7 @@ export default function LaminadorDetail() {
               tab === "checklist" ? "bg-white text-iasa-blue" : "bg-white/15 text-white"
             }`}
           >
-            📋 Checklist diario
+            📋 Checklist de componentes
           </button>
           <button
             onClick={() => setTab("rodillos")}
@@ -199,7 +199,7 @@ export default function LaminadorDetail() {
               to={`/laminadores/${id}/checklist`}
               className="block w-full text-center bg-iasa-blue text-white font-semibold rounded-xl py-3"
             >
-              + Llenar checklist de hoy
+              + Llenar checklist de componentes
             </Link>
 
             {checklists.length === 0 && (
