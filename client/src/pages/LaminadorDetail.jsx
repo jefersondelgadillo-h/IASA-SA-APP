@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../lib/api.js";
 import Logo from "../components/Logo.jsx";
 import EmptyState from "../components/EmptyState.jsx";
+import BackButton from "../components/BackButton.jsx";
 import { rodilloLabel } from "../lib/rodillo.js";
 
 function todayISO() {
@@ -151,6 +152,7 @@ export default function LaminadorDetail() {
     <div className="min-h-screen bg-gray-100 pb-10">
       <header className="bg-iasa-blue text-white px-4 py-4">
         <div className="flex items-center gap-2.5 mb-3">
+          <BackButton to="/laminadores" />
           <div className="bg-white rounded-lg px-2 py-1 shrink-0">
             <Logo className="h-6" fallbackClassName="text-iasa-blue font-bold text-xs" />
           </div>
@@ -330,14 +332,6 @@ export default function LaminadorDetail() {
           </>
         )}
 
-        <div className="flex justify-center gap-4 pt-4">
-          <Link to="/laminadores" className="text-xs text-gray-400 underline">
-            Otro laminador
-          </Link>
-          <Link to="/" className="text-xs text-gray-400 underline">
-            Volver al inicio
-          </Link>
-        </div>
       </main>
 
       {showForm && <ResetForm laminadorId={id} onSaved={handleSaved} onCancel={() => setShowForm(false)} />}
