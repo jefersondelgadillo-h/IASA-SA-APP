@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { api } from "../lib/api.js";
 import Logo from "../components/Logo.jsx";
+import BackButton from "../components/BackButton.jsx";
 import { rodilloLabel } from "../lib/rodillo.js";
 import { getAdminPassword, setAdminPassword } from "../lib/session.js";
 
@@ -149,6 +150,7 @@ export default function RodilloReportDetail() {
   return (
     <div className="min-h-screen bg-gray-100 pb-10">
       <header className="bg-iasa-blue text-white px-4 py-4 flex items-center gap-2.5">
+        <BackButton to={`/laminadores/${id}`} />
         <div className="bg-white rounded-lg px-2 py-1 shrink-0">
           <Logo className="h-6" fallbackClassName="text-iasa-blue font-bold text-xs" />
         </div>
@@ -261,10 +263,6 @@ export default function RodilloReportDetail() {
                 </button>
               )}
             </section>
-
-            <Link to={`/laminadores/${id}`} className="block text-center text-xs text-gray-400 underline pt-2">
-              Volver al laminador
-            </Link>
           </>
         )}
       </main>

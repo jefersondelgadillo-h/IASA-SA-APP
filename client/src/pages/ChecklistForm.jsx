@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../lib/api.js";
 import Logo from "../components/Logo.jsx";
+import BackButton from "../components/BackButton.jsx";
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -77,6 +78,7 @@ export default function ChecklistForm() {
   return (
     <div className="min-h-screen bg-gray-100 pb-28">
       <header className="bg-iasa-blue text-white px-4 py-4 flex items-center gap-2.5 sticky top-0 z-10 shadow">
+        <BackButton to={`/laminadores/${id}`} />
         <div className="bg-white rounded-lg px-2 py-1 shrink-0">
           <Logo className="h-6" fallbackClassName="text-iasa-blue font-bold text-xs" />
         </div>
@@ -155,10 +157,6 @@ export default function ChecklistForm() {
                 </div>
               </section>
             ))}
-
-            <Link to={`/laminadores/${id}`} className="block text-center text-xs text-gray-400 underline pt-2">
-              Cancelar y volver
-            </Link>
           </>
         )}
       </main>

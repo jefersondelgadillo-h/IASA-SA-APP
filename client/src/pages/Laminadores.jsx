@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api.js";
 import Logo from "../components/Logo.jsx";
+import BackButton from "../components/BackButton.jsx";
 
 export default function Laminadores() {
   const [laminadores, setLaminadores] = useState([]);
@@ -14,6 +15,7 @@ export default function Laminadores() {
   return (
     <div className="min-h-screen bg-gray-100 pb-10">
       <header className="bg-iasa-blue text-white px-4 py-4 flex items-center gap-2.5">
+        <BackButton to="/" />
         <div className="bg-white rounded-lg px-2 py-1 shrink-0">
           <Logo className="h-6" fallbackClassName="text-iasa-blue font-bold text-xs" />
         </div>
@@ -40,10 +42,6 @@ export default function Laminadores() {
             </Link>
           ))}
         </div>
-
-        <Link to="/" className="block text-center text-xs text-gray-400 underline mt-8">
-          Volver al inicio
-        </Link>
       </main>
     </div>
   );
