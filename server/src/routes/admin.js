@@ -208,64 +208,9 @@ router.get("/admin/export", adminAuth, async (req, res) => {
   res.send(buffer);
 });
 
-// Indicadores de gestion que no vienen del Excel (Fallas de Equipos, Cumplimiento
-// al Programa de Mantenimiento Anual): el supervisor los carga a mano aqui,
-// una fila por semana y por linea de produccion (Crown / Tecnal), tomandolos
-// de su reporte de Power BI/SAP semanal. Se puede cargar o corregir cualquier
-// semana (pasada o actual) que ya tenga programacion subida.
-router.patch("/admin/indicators", adminAuth, async (req, res) => {
-  const {
-    week,
-    fallas_equipos_crown_pct,
-    fallas_equipos_tecnal_pct,
-    fallas_equipos_meta,
-    cumplimiento_anual_crown_pct,
-    cumplimiento_anual_tecnal_pct,
-    cumplimiento_anual_meta,
-  } = req.body || {};
-  if (!week) return res.status(400).json({ error: "Falta indicar la semana." });
-
-  const weekRow = await db.prepare("SELECT week_start FROM weeks WHERE week_start = ?").get(week);
-  if (!weekRow) return res.status(400).json({ error: "Esa semana no tiene programacion cargada todavia." });
-
-  const now = new Date().toISOString();
-  const toNum = (v, fallback = null) => (v === "" || v == null ? fallback : Number(v));
-
-  await db
-    .prepare(
-      `INSERT INTO week_indicators
-         (week_start, fallas_equipos_crown_pct, fallas_equipos_tecnal_pct, fallas_equipos_meta,
-          cumplimiento_anual_crown_pct, cumplimiento_anual_tecnal_pct, cumplimiento_anual_meta,
-          updated_at, updated_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(week_start) DO UPDATE SET
-         fallas_equipos_crown_pct = excluded.fallas_equipos_crown_pct,
-         fallas_equipos_tecnal_pct = excluded.fallas_equipos_tecnal_pct,
-         fallas_equipos_meta = excluded.fallas_equipos_meta,
-         cumplimiento_anual_crown_pct = excluded.cumplimiento_anual_crown_pct,
-         cumplimiento_anual_tecnal_pct = excluded.cumplimiento_anual_tecnal_pct,
-         cumplimiento_anual_meta = excluded.cumplimiento_anual_meta,
-         updated_at = excluded.updated_at,
-         updated_by = excluded.updated_by`
-    )
-    .run(
-      week,
-      toNum(fallas_equipos_crown_pct),
-      toNum(fallas_equipos_tecnal_pct),
-      toNum(fallas_equipos_meta, 3),
-      toNum(cumplimiento_anual_crown_pct),
-      toNum(cumplimiento_anual_tecnal_pct),
-      toNum(cumplimiento_anual_meta, 90),
-      now,
-      "Supervisor"
-    );
-
-  res.json(await db.prepare("SELECT * FROM week_indicators WHERE week_start = ?").get(week));
-});
-
-// Elimina por completo la programacion de una semana (actividades, su
-// historial de cambios y sus indicadores manuales caen en cascada). No se
-// puede deshacer: el frontend pide confirmacion antes de llamar esto.
+// Elimina por completo la programacion de una semana (actividades y su
+// historial de cambios caen en cascada). No se puede deshacer: el frontend
+// pide confirmacion antes de llamar esto.
 router.delete("/admin/weeks/:week_start", adminAuth, async (req, res) => {
   const { week_start } = req.params;
   const weekRow = await db.prepare("SELECT id FROM weeks WHERE week_start = ?").get(week_start);

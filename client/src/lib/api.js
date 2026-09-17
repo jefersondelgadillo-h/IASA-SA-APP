@@ -26,7 +26,6 @@ export const api = {
   updateStatus: (id, body) =>
     request(`/activities/${id}/status`, { method: "PATCH", body: JSON.stringify(body) }),
   getHistory: (id) => request(`/activities/${id}/history`),
-  getIndicators: (week) => request(`/indicators${week ? `?week=${week}` : ""}`),
   getLaminadores: () => request("/laminadores"),
   getLaminadorResets: (id) => request(`/laminadores/${id}/resets`),
   addLaminadorReset: (id, body) =>
@@ -66,12 +65,6 @@ export const api = {
   adminGetTechnicians: (password) => request("/admin/technicians", { headers: { "x-admin-password": password } }),
   adminUpdateTechnician: (password, id, body) =>
     request(`/admin/technicians/${id}`, {
-      method: "PATCH",
-      headers: { "x-admin-password": password },
-      body: JSON.stringify(body),
-    }),
-  adminUpdateIndicators: (password, body) =>
-    request("/admin/indicators", {
       method: "PATCH",
       headers: { "x-admin-password": password },
       body: JSON.stringify(body),
