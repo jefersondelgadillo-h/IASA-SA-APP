@@ -6,6 +6,7 @@ import StatTile from "../components/StatTile.jsx";
 import ProgressBar from "../components/ProgressBar.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import Logo from "../components/Logo.jsx";
+import { formatWeekLabel } from "../lib/isoWeek.js";
 
 const STATUS_FILTERS = ["Todos", "Pendiente", "En progreso", "Completado", "Con problema"];
 
@@ -257,7 +258,7 @@ export default function Schedule({ technician, onChangeUser }) {
             >
               {weeks.map((w) => (
                 <option key={w.week_start} value={w.week_start} className="text-gray-900">
-                  {w.week_start}
+                  {formatWeekLabel(w.week_start)}
                 </option>
               ))}
             </select>
