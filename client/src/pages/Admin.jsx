@@ -10,6 +10,7 @@ import ProgressBar from "../components/ProgressBar.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import Logo from "../components/Logo.jsx";
 import LaminadoresAdminSection from "../components/LaminadoresAdminSection.jsx";
+import { formatWeekLabel, generateWeekOptions } from "../lib/isoWeek.js";
 
 const STATUS_TONES = { Pendiente: "gray", "En progreso": "amber", Completado: "green", "Con problema": "red" };
 
@@ -281,13 +282,18 @@ export default function Admin() {
           <SectionHeader icon="📂" title="Cargar programacion semanal (Excel)" />
           <form onSubmit={handleUpload} className="space-y-3">
             <div>
-              <label className="block text-sm text-gray-600 mb-1">Inicio de semana (lunes)</label>
-              <input
-                type="date"
+              <label className="block text-sm text-gray-600 mb-1">Semana</label>
+              <select
                 value={weekStart}
                 onChange={(e) => setWeekStart(e.target.value)}
                 className="w-full border border-gray-300 rounded-xl p-2.5 text-sm"
-              />
+              >
+                {generateWeekOptions().map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-sm text-gray-600 mb-1">Archivo .xlsx</label>
@@ -364,7 +370,7 @@ export default function Admin() {
               >
                 {weeksList.map((w) => (
                   <option key={w.week_start} value={w.week_start}>
-                    {w.week_start}
+                    {formatWeekLabel(w.week_start)}
                   </option>
                 ))}
               </select>
@@ -385,15 +391,15 @@ export default function Admin() {
                   onClick={() => setConfirmDeleteWeek(true)}
                   className="text-xs text-red-600 underline"
                 >
-                  🗑️ Eliminar la programacion de la semana {dashboardWeek}
+                  🗑️ Eliminar la programacion de la {dashboardWeek && formatWeekLabel(dashboardWeek)}
                 </button>
               ) : (
                 <div className="bg-red-50 border border-red-200 rounded-xl p-3">
                   <p className="text-sm text-red-800 font-medium mb-1">
-                    ¿Eliminar por completo la semana {dashboardWeek}?
+                    ¿Eliminar por completo la {dashboardWeek && formatWeekLabel(dashboardWeek)}?
                   </p>
                   <p className="text-xs text-red-700 mb-2">
-                    Se borran todas sus actividades, el historial de cambios y sus indicadores. No se puede deshacer.
+                    Se borran todas sus actividades y su historial de cambios. No se puede deshacer.
                   </p>
                   <div className="flex gap-2">
                     <button

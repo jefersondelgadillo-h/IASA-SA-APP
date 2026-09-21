@@ -1,4 +1,5 @@
 import StatusBadge from "./StatusBadge.jsx";
+import { formatWeekShort } from "../lib/isoWeek.js";
 
 const ACCENT_BY_STATUS = {
   Pendiente: "border-l-gray-300",
@@ -33,7 +34,7 @@ export default function ActivityCard({ activity, onClick }) {
           <StatusBadge status={activity.status} />
           {activity._week && (
             <span className="text-[10px] font-semibold text-amber-700 bg-amber-100 rounded-full px-2 py-0.5 whitespace-nowrap">
-              Semana {activity._week}
+              {formatWeekShort(activity._week)}
             </span>
           )}
         </div>
