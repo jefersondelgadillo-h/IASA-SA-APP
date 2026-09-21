@@ -178,6 +178,17 @@ export default function RodilloMeasurementForm() {
                 </section>
 
                 <section className="bg-white rounded-2xl shadow-sm p-4">
+                  <p className="text-sm font-medium text-gray-700 mb-2">Esquema y leyenda de referencia</p>
+                  <div className="overflow-x-auto -mx-2 px-2">
+                    <img
+                      src="/rodillo-esquema.png"
+                      alt="Esquema y leyenda: R1AR/R1DR/R2AR/R2DR, ubicacion de los puntos de medicion y colores de la galga (verde pasa, rojo no pasa)"
+                      className="min-w-[600px] w-full rounded-lg border border-gray-100"
+                    />
+                  </div>
+                </section>
+
+                <section className="bg-white rounded-2xl shadow-sm p-4">
                   <p className="text-sm font-medium text-gray-700 mb-1">Lecturas de la galga [0,05 mm]</p>
                   <p className="text-xs text-gray-500 mb-3">
                     Punto 1: a 5 pulgadas del extremo izquierdo del rolo. Distancia entre puntos: 5 pulgadas.
