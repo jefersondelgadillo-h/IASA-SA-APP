@@ -216,7 +216,7 @@ export default function Schedule({ technician, onChangeUser }) {
   }, [merged]);
 
   async function handleSaveStatus(ids, body) {
-    const updates = await Promise.all(ids.map((id) => api.updateStatus(id, body)));
+    const updates = await api.updateStatusBulk(ids, body);
     const byId = new Map(updates.map((u) => [u.id, u]));
     setActivities((prev) => prev.map((a) => (byId.has(a.id) ? { ...a, ...byId.get(a.id) } : a)));
     // Si era una actividad de una semana anterior y quedo Completado, sale

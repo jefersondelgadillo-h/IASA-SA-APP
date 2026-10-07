@@ -39,6 +39,10 @@ export const api = {
   },
   updateStatus: (id, body) =>
     request(`/activities/${id}/status`, { method: "PATCH", body: JSON.stringify(body) }),
+  // Actualiza de una sola vez todas las filas/dias de una orden fusionada
+  // (una sola notificacion a Power Automate en vez de una por dia).
+  updateStatusBulk: (ids, body) =>
+    request(`/activities/status`, { method: "PATCH", body: JSON.stringify({ ids, ...body }) }),
   getHistory: (id) => request(`/activities/${id}/history`),
   getLaminadores: () => request("/laminadores"),
   getLaminadorResets: (id) => request(`/laminadores/${id}/resets`),
