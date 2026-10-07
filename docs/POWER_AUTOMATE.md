@@ -112,3 +112,9 @@ cada actualizacion de estado disparara el flujo automaticamente.
   ejemplo para avisar automaticamente cuando llega el Excel nuevo cada
   lunes por Outlook y subirlo solo a la app (usando el endpoint
   `POST /api/admin/upload`, protegido con la clave de administrador).
+- Si una orden de trabajo tiene horas repartidas en varios dias de la
+  semana, la app la muestra como una sola tarjeta y el tecnico la
+  actualiza una sola vez: eso dispara una sola notificacion (antes
+  llegaba una copia por cada dia de la orden). En ese caso
+  `activity.activity_date` puede traer varias fechas separadas por coma
+  en vez de una sola.
